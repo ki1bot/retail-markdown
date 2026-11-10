@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    DatasetStatusView,
     HealthView,
     HistoryView,
     ImportView,
@@ -20,6 +21,11 @@ urlpatterns = [
         "csrf/",
         csrf_view,
         name="csrf",
+    ),
+    path(
+        "data/status/",
+        DatasetStatusView.as_view(),
+        name="data-status",
     ),
     path(
         "data/summary/",

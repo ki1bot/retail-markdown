@@ -40,6 +40,69 @@ class HealthView(APIView):
         })
 
 
+class DatasetStatusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        datasets = {
+            "sales": {
+                "source": "sales",
+                "rows": 0,
+                "first_date": None,
+                "last_date": None,
+                "stores": 0,
+                "products": 0,
+            },
+            "inventory": {
+                "source": "inventory",
+                "rows": 0,
+                "first_date": None,
+                "last_date": None,
+                "stores": 0,
+                "products": 0,
+            },
+        }
+
+        records = (
+            RetailObservation.objects.values("source")
+            .annotate(
+                rows=Count("id"),
+                first_date=Min("observed_on"),
+                last_date=Max("observed_on"),
+                stores=Count("store_id", distinct=True),
+                products=Count("product_id", distinct=True),
+            )
+            .order_by("source")
+        )
+
+        for record in records:
+            source = record["source"]
+
+            if source not in datasets:
+                continue
+
+            datasets[source] = {
+                "source": source,
+                "rows": record["rows"],
+                "first_date": (
+                    record["first_date"].isoformat()
+                    if record["first_date"]
+                    else None
+                ),
+                "last_date": (
+                    record["last_date"].isoformat()
+                    if record["last_date"]
+                    else None
+                ),
+                "stores": record["stores"],
+                "products": record["products"],
+            }
+
+        return Response({
+            "datasets": datasets,
+        })
+
+
 class SummaryView(APIView):
     permission_classes = [AllowAny]
 

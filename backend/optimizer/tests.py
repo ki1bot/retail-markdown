@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -220,4 +221,72 @@ class ImportTests(TestCase):
         self.assertEqual(
             RetailObservation.objects.count(),
             0,
+        )
+
+    def test_dataset_status_endpoint(self):
+        response = self.client.get(
+            "/api/data/status/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            response.json()["datasets"]["sales"]["rows"],
+            0,
+        )
+
+        self.assertEqual(
+            response.json()["datasets"]["inventory"]["rows"],
+            0,
+        )
+
+        RetailObservation.objects.create(
+            source="sales",
+            observed_on=date(2023, 1, 1),
+            store_id="S001",
+            product_id="P001",
+            category="Clothing",
+            region="North",
+            inventory_level=100,
+            units_sold=20,
+            units_ordered=30,
+            demand_value=Decimal("25.00"),
+            price=Decimal("71.49"),
+            discount=15,
+            seasonality="Summer",
+            promotion=True,
+        )
+
+        response = self.client.get(
+            "/api/data/status/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        sales = response.json()["datasets"]["sales"]
+
+        self.assertEqual(
+            sales["rows"],
+            1,
+        )
+
+        self.assertEqual(
+            sales["first_date"],
+            "2023-01-01",
+        )
+
+        self.assertEqual(
+            sales["stores"],
+            1,
+        )
+
+        self.assertEqual(
+            sales["products"],
+            1,
         )

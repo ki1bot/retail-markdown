@@ -3,9 +3,15 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def env_bool(name, default=False):
+    value = os.environ.get(name, str(default))
+    return value.lower() in ("true", "1", "yes", "on")
+
+
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+DEBUG = env_bool("DJANGO_DEBUG", False)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -65,6 +71,8 @@ DATABASES = {
         "PASSWORD": os.environ["POSTGRES_PASSWORD"],
         "HOST": os.environ.get("POSTGRES_HOST", "database"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": 60,
+        "CONN_HEALTH_CHECKS": True,
     }
 }
 
@@ -83,6 +91,21 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "user": "60/min",
+    },
+}
+
 LANGUAGE_CODE = "id"
 
 TIME_ZONE = "Asia/Jakarta"
@@ -90,6 +113,26 @@ TIME_ZONE = "Asia/Jakarta"
 USE_I18N = True
 
 USE_TZ = True
+
+SESSION_COOKIE_HTTPONLY = True
+
+SESSION_COOKIE_SAMESITE = "Lax"
+
+SESSION_COOKIE_SECURE = env_bool("DJANGO_COOKIE_SECURE", False)
+
+CSRF_COOKIE_HTTPONLY = False
+
+CSRF_COOKIE_SAMESITE = "Lax"
+
+CSRF_COOKIE_SECURE = env_bool("DJANGO_COOKIE_SECURE", False)
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+X_FRAME_OPTIONS = "DENY"
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 18000000
+
+FILE_UPLOAD_MAX_MEMORY_SIZE = 15000000
 
 STATIC_URL = "static/"
 

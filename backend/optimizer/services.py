@@ -4,14 +4,13 @@ from itertools import product
 
 DISCOUNT_OPTIONS = (0, 5, 10, 15, 20, 25)
 TARGET_WEEKS = 4
-ELASTICITY = -2
 
 
 def round_units(value):
     return int(
         value.quantize(
             Decimal("1"),
-            rounding=ROUND_HALF_UP
+            rounding=ROUND_HALF_UP,
         )
     )
 
@@ -20,12 +19,19 @@ def round_money(value):
     return str(
         value.quantize(
             Decimal("0.01"),
-            rounding=ROUND_HALF_UP
+            rounding=ROUND_HALF_UP,
         )
     )
 
 
-def calculate_plan(plan, stock, price, base_demand, hpp_ratio):
+def calculate_plan(
+    plan,
+    stock,
+    price,
+    base_demand,
+    hpp_ratio,
+    elasticity,
+):
     remaining = stock
     total_profit = Decimal("0")
     schedule = []
@@ -37,7 +43,7 @@ def calculate_plan(plan, stock, price, base_demand, hpp_ratio):
         price_factor = Decimal("1") - discount_rate
 
         demand = round_units(
-            base_demand / (price_factor ** abs(ELASTICITY))
+            base_demand / (price_factor ** abs(elasticity))
         )
 
         sold = min(remaining, demand)
@@ -75,6 +81,7 @@ def optimize_discount(data):
     weekly_average = data["weekly_average"]
     demand_ratio = data["demand_ratio"]
     hpp_ratio = data["hpp_ratio"]
+    elasticity = data["elasticity"]
 
     base_demand = Decimal(weekly_average) * demand_ratio
 
@@ -83,7 +90,7 @@ def optimize_discount(data):
 
     combinations = product(
         DISCOUNT_OPTIONS,
-        repeat=TARGET_WEEKS
+        repeat=TARGET_WEEKS,
     )
 
     for combination in combinations:
@@ -92,7 +99,8 @@ def optimize_discount(data):
             stock,
             price,
             base_demand,
-            hpp_ratio
+            hpp_ratio,
+            elasticity,
         )
 
         if result["remaining"] != 0:
@@ -102,7 +110,8 @@ def optimize_discount(data):
 
         if (
             best_plan is None
-            or result["total_profit_raw"] > best_plan["total_profit_raw"]
+            or result["total_profit_raw"]
+            > best_plan["total_profit_raw"]
         ):
             best_plan = result
 
@@ -114,10 +123,12 @@ def optimize_discount(data):
         stock,
         price,
         base_demand,
-        hpp_ratio
+        hpp_ratio,
+        elasticity,
     )
 
     improvement = None
+    improvement_percent = None
 
     if fixed_plan["remaining"] == 0:
         improvement = (
@@ -125,10 +136,17 @@ def optimize_discount(data):
             - fixed_plan["total_profit_raw"]
         )
 
+        if fixed_plan["total_profit_raw"] != 0:
+            improvement_percent = (
+                improvement
+                / abs(fixed_plan["total_profit_raw"])
+                * Decimal("100")
+            )
+
     return {
         "stock": stock,
         "target_weeks": TARGET_WEEKS,
-        "elasticity": ELASTICITY,
+        "elasticity": str(elasticity),
         "discount_options": list(DISCOUNT_OPTIONS),
         "tested_plans": len(DISCOUNT_OPTIONS) ** TARGET_WEEKS,
         "feasible_plans": feasible_plans,
@@ -149,6 +167,11 @@ def optimize_discount(data):
             "profit_improvement": (
                 round_money(improvement)
                 if improvement is not None
+                else None
+            ),
+            "improvement_percent": (
+                round_money(improvement_percent)
+                if improvement_percent is not None
                 else None
             ),
         },

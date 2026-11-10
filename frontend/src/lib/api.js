@@ -12,6 +12,16 @@ function getCookie(name) {
   return "";
 }
 
+async function ensureCsrfToken() {
+  const response = await fetch("/api/csrf/", {
+    credentials: "same-origin",
+  });
+
+  if (!response.ok) {
+    throw new Error("Gagal menyiapkan permintaan.");
+  }
+}
+
 async function request(path, options = {}) {
   const method = options.method || "GET";
 
@@ -20,6 +30,8 @@ async function request(path, options = {}) {
   };
 
   if (!["GET", "HEAD"].includes(method.toUpperCase())) {
+    await ensureCsrfToken();
+
     headers["X-CSRFToken"] = getCookie("csrftoken");
   }
 

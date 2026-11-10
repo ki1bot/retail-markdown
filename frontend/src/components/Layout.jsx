@@ -30,10 +30,8 @@ const titles = {
 };
 
 export default function Layout({
-  user,
   page,
   onNavigate,
-  onLogout,
   source,
   onSourceChange,
   year,
@@ -78,20 +76,8 @@ export default function Layout({
             })}
           </nav>
 
-          <div className="hidden border-t border-zinc-800 px-6 py-5 lg:block">
-            <p className="truncate text-sm text-zinc-300">{user.username}</p>
-
-            <p className="mt-1 text-xs text-zinc-500">
-              {user.is_staff ? "Administrator" : "Pengguna"}
-            </p>
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="mt-4 text-sm text-zinc-400 hover:text-white"
-            >
-              Keluar
-            </button>
+          <div className="hidden border-t border-zinc-800 px-6 py-5 text-xs text-zinc-500 lg:block">
+            Retail Markdown Optimizer
           </div>
         </aside>
 
@@ -128,14 +114,6 @@ export default function Layout({
                     </option>
                   ))}
               </select>
-
-              <button
-                type="button"
-                onClick={onLogout}
-                className="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 lg:hidden"
-              >
-                Keluar
-              </button>
             </div>
           </header>
 

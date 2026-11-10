@@ -11,7 +11,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,6 +22,7 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    network_mode: "service:database"
     env_file:
       - .env
     volumes:

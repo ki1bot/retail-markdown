@@ -49,7 +49,7 @@ export default function History() {
       <h3 className="font-medium text-white">Simulasi tersimpan</h3>
 
       <p className="mt-2 text-sm text-zinc-400">
-        Menampilkan 20 simulasi terbaru milik akun ini.
+        Menampilkan 20 simulasi terbaru.
       </p>
 
       {history.length === 0 ? (

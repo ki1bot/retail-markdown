@@ -1,19 +1,16 @@
-import json
-
-from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.contrib.auth import authenticate, login, logout
 from django.db import connection
 from django.db.models import Avg, Count, Max, Min, Sum
 from django.db.models.functions import ExtractMonth, ExtractYear
 from django.http import JsonResponse
+from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET
 
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -23,83 +20,10 @@ from .serializers import SimulationSerializer
 from .services import optimize_discount
 
 
-def user_payload(user):
-    return {
-        "id": user.id,
-        "username": user.get_username(),
-        "is_staff": user.is_staff,
-    }
-
-
 @ensure_csrf_cookie
 @require_GET
 def csrf_view(request):
     return JsonResponse({"status": "ok"})
-
-
-@require_GET
-def me_view(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({
-            "authenticated": False,
-            "user": None,
-        })
-
-    return JsonResponse({
-        "authenticated": True,
-        "user": user_payload(request.user),
-    })
-
-
-@csrf_protect
-@require_POST
-def login_view(request):
-    try:
-        data = json.loads(request.body)
-    except (ValueError, UnicodeDecodeError):
-        return JsonResponse(
-            {"detail": "Format permintaan tidak valid."},
-            status=400,
-        )
-
-    username = str(data.get("username", "")).strip()
-    password = str(data.get("password", ""))
-
-    if not username or not password:
-        return JsonResponse(
-            {"detail": "Username dan password wajib diisi."},
-            status=400,
-        )
-
-    user = authenticate(
-        request,
-        username=username,
-        password=password,
-    )
-
-    if user is None or not user.is_active:
-        return JsonResponse(
-            {"detail": "Username atau password salah."},
-            status=401,
-        )
-
-    login(request, user)
-
-    return JsonResponse({
-        "authenticated": True,
-        "user": user_payload(user),
-    })
-
-
-@csrf_protect
-@require_POST
-def logout_view(request):
-    logout(request)
-
-    return JsonResponse({
-        "authenticated": False,
-        "user": None,
-    })
 
 
 class HealthView(APIView):
@@ -117,7 +41,7 @@ class HealthView(APIView):
 
 
 class SummaryView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         source = request.query_params.get(
@@ -301,8 +225,9 @@ class SummaryView(APIView):
         })
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class ImportView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -328,8 +253,9 @@ class ImportView(APIView):
         )
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class OptimizeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = SimulationSerializer(
@@ -356,7 +282,7 @@ class OptimizeView(APIView):
             )
 
         record = SimulationRun.objects.create(
-            user=request.user,
+            user=None,
             input_data={
                 key: str(value)
                 for key, value in validated.items()
@@ -371,13 +297,11 @@ class OptimizeView(APIView):
 
 
 class HistoryView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         records = (
-            SimulationRun.objects.filter(
-                user=request.user
-            )
+            SimulationRun.objects
             .order_by("-created_at")[:20]
         )
 

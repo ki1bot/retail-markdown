@@ -17,7 +17,7 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
         "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1,backend"
+        "localhost,127.0.0.1,backend",
     ).split(",")
     if host.strip()
 ]
@@ -69,7 +69,7 @@ DATABASES = {
         "NAME": os.environ["POSTGRES_DB"],
         "USER": os.environ["POSTGRES_USER"],
         "PASSWORD": os.environ["POSTGRES_PASSWORD"],
-        "HOST": os.environ.get("POSTGRES_HOST", "database"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
         "CONN_MAX_AGE": 60,
         "CONN_HEALTH_CHECKS": True,
@@ -92,17 +92,14 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
-    ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.AllowAny",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "user": "60/min",
+        "anon": "60/min",
     },
 }
 
@@ -118,13 +115,19 @@ SESSION_COOKIE_HTTPONLY = True
 
 SESSION_COOKIE_SAMESITE = "Lax"
 
-SESSION_COOKIE_SECURE = env_bool("DJANGO_COOKIE_SECURE", False)
+SESSION_COOKIE_SECURE = env_bool(
+    "DJANGO_COOKIE_SECURE",
+    False,
+)
 
 CSRF_COOKIE_HTTPONLY = False
 
 CSRF_COOKIE_SAMESITE = "Lax"
 
-CSRF_COOKIE_SECURE = env_bool("DJANGO_COOKIE_SECURE", False)
+CSRF_COOKIE_SECURE = env_bool(
+    "DJANGO_COOKIE_SECURE",
+    False,
+)
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 

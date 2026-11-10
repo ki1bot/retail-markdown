@@ -7,9 +7,6 @@ from .views import (
     OptimizeView,
     SummaryView,
     csrf_view,
-    login_view,
-    logout_view,
-    me_view,
 )
 
 
@@ -20,24 +17,9 @@ urlpatterns = [
         name="health",
     ),
     path(
-        "auth/csrf/",
+        "csrf/",
         csrf_view,
-        name="auth-csrf",
-    ),
-    path(
-        "auth/me/",
-        me_view,
-        name="auth-me",
-    ),
-    path(
-        "auth/login/",
-        login_view,
-        name="auth-login",
-    ),
-    path(
-        "auth/logout/",
-        logout_view,
-        name="auth-logout",
+        name="csrf",
     ),
     path(
         "data/summary/",

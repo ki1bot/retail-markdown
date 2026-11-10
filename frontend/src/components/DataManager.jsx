@@ -15,7 +15,7 @@ const datasets = [
   },
 ];
 
-export default function DataManager({ user, summary, onImported }) {
+export default function DataManager({ summary, onImported }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -99,48 +99,42 @@ export default function DataManager({ user, summary, onImported }) {
         </div>
       </div>
 
-      {user.is_staff ? (
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-lg border border-zinc-800 bg-[#111114] p-5"
-        >
-          <h3 className="font-medium text-white">Impor CSV</h3>
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-lg border border-zinc-800 bg-[#111114] p-5"
+      >
+        <h3 className="font-medium text-white">Impor CSV</h3>
 
-          <p className="mt-2 text-sm leading-6 text-zinc-400">
-            Pilih salah satu dataset ritel. Impor ulang akan mengganti data dari
-            sumber yang sama.
-          </p>
-
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            required
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
-            className="mt-5 block w-full rounded-md border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-300 file:mr-4 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-sm file:text-white"
-          />
-
-          {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-5 rounded-md bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-zinc-200 disabled:opacity-50"
-          >
-            {loading ? "Mengimpor data..." : "Impor dataset"}
-          </button>
-        </form>
-      ) : (
-        <p className="text-sm text-zinc-500">
-          Impor dataset hanya tersedia untuk administrator.
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
+          Pilih salah satu dataset ritel. Impor ulang akan mengganti data dari
+          sumber yang sama.
         </p>
-      )}
+
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          required
+          onChange={(event) => setFile(event.target.files?.[0] || null)}
+          className="mt-5 block w-full rounded-md border border-zinc-700 bg-zinc-950 p-3 text-sm text-zinc-300 file:mr-4 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-sm file:text-white"
+        />
+
+        {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-5 rounded-md bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-zinc-200 disabled:opacity-50"
+        >
+          {loading ? "Mengimpor data..." : "Impor dataset"}
+        </button>
+      </form>
 
       <div className="rounded-lg border border-zinc-800 bg-[#111114] p-5">
         <h3 className="font-medium text-white">Batasan data</h3>
 
         <p className="mt-2 text-sm leading-7 text-zinc-400">
           Dataset tidak memiliki penanda khusus untuk stok pakaian musim
-          sebelumnya. Nilai Inventory Level juga merupakan catatan persediaan
+          sebelumnya. Nilai Inventory Level merupakan catatan persediaan
           historis, bukan stok akhir toko yang dapat dijumlahkan antarperiode.
         </p>
       </div>

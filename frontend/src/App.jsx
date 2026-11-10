@@ -65,7 +65,6 @@ export default function App() {
     setSummaryError("");
     setLoadingSummary(true);
     setReloadKey((value) => value + 1);
-    setPage("dashboard");
   }
 
   let content = null;
@@ -110,7 +109,14 @@ export default function App() {
   }
 
   if (page === "data") {
-    content = <DataManager summary={summary} onImported={handleImport} />;
+    content = (
+      <DataManager
+        source={source}
+        year={year}
+        summary={summary}
+        onImported={handleImport}
+      />
+    );
   }
 
   return (

@@ -42,9 +42,9 @@ export default function Layout({
   const years = availableYears.length ? availableYears : [2022, 2023, 2024];
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100">
-      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col lg:flex-row">
-        <aside className="border-b border-zinc-800 bg-[#0d0d0f] lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r">
+    <div className="min-h-screen w-full bg-[#09090b] text-zinc-100">
+      <div className="flex min-h-screen w-full flex-col lg:flex-row">
+        <aside className="w-full shrink-0 border-b border-zinc-800 bg-[#0d0d0f] lg:w-60 lg:border-b-0 lg:border-r">
           <div className="border-b border-zinc-800 px-6 py-6">
             <h1 className="text-lg font-semibold tracking-tight text-white">
               Retail Markdown
@@ -75,49 +75,47 @@ export default function Layout({
               );
             })}
           </nav>
-
-          <div className="hidden border-t border-zinc-800 px-6 py-5 text-xs text-zinc-500 lg:block">
-            Retail Markdown Optimizer
-          </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
-          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 px-5 py-5 md:px-8">
-            <div>
-              <h2 className="text-xl font-semibold text-white">
-                {titles[page]}
-              </h2>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="w-full border-b border-zinc-800 px-4 py-5 sm:px-6 lg:px-8">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-white">
+                  {titles[page]}
+                </h2>
 
-              <p className="mt-1 text-xs text-zinc-500">Kategori Clothing</p>
-            </div>
+                <p className="mt-1 text-xs text-zinc-500">Kategori Clothing</p>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={source}
-                onChange={(event) => onSourceChange(event.target.value)}
-                className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500"
-              >
-                <option value="sales">Retail Sales</option>
-                <option value="inventory">Retail Inventory</option>
-              </select>
+              <div className="flex flex-wrap items-center gap-3">
+                <select
+                  value={source}
+                  onChange={(event) => onSourceChange(event.target.value)}
+                  className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500"
+                >
+                  <option value="sales">Retail Sales</option>
+                  <option value="inventory">Retail Inventory</option>
+                </select>
 
-              <select
-                value={year}
-                onChange={(event) => onYearChange(Number(event.target.value))}
-                className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500"
-              >
-                {[...new Set([...years, year])]
-                  .sort((a, b) => a - b)
-                  .map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-              </select>
+                <select
+                  value={year}
+                  onChange={(event) => onYearChange(Number(event.target.value))}
+                  className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500"
+                >
+                  {[...new Set([...years, year])]
+                    .sort((a, b) => a - b)
+                    .map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                </select>
+              </div>
             </div>
           </header>
 
-          <main className="mx-auto max-w-7xl px-5 py-7 md:px-8">
+          <main className="w-full min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
             {children}
           </main>
         </div>

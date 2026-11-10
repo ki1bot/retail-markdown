@@ -68,25 +68,43 @@ def parse_observation(row, source):
 
     price = Decimal(row["Price"])
     demand = Decimal(row[demand_column])
+
     discount = parse_nonnegative_int(
         row["Discount"],
         "Discount",
     )
 
-    if price <= 0:
-        raise ValueError("Harga produk harus lebih dari nol.")
+    if not price.is_finite() or price <= 0:
+        raise ValueError(
+            "Harga produk harus lebih dari nol."
+        )
+
+    if not demand.is_finite():
+        raise ValueError(
+            "Nilai permintaan tidak valid."
+        )
+
+    corrected_forecast = False
 
     if demand < 0:
-        raise ValueError("Permintaan tidak boleh negatif.")
+        if source == "inventory":
+            demand = Decimal("0")
+            corrected_forecast = True
+        else:
+            raise ValueError(
+                "Permintaan tidak boleh negatif."
+            )
 
     if discount > 100:
         raise ValueError(
             "Persentase diskon tidak boleh melebihi 100."
         )
 
-    return RetailObservation(
+    observation = RetailObservation(
         source=source,
-        observed_on=date.fromisoformat(row["Date"]),
+        observed_on=date.fromisoformat(
+            row["Date"]
+        ),
         store_id=row["Store ID"].strip(),
         product_id=row["Product ID"].strip(),
         category=row["Category"].strip(),
@@ -112,10 +130,14 @@ def parse_observation(row, source):
         ),
     )
 
+    return observation, corrected_forecast
+
 
 def import_retail_csv(uploaded_file):
     if not uploaded_file.name.lower().endswith(".csv"):
-        raise ValueError("File harus menggunakan format CSV.")
+        raise ValueError(
+            "File harus menggunakan format CSV."
+        )
 
     if uploaded_file.size > 12000000:
         raise ValueError(
@@ -123,7 +145,9 @@ def import_retail_csv(uploaded_file):
         )
 
     if uploaded_file.size == 0:
-        raise ValueError("File CSV kosong.")
+        raise ValueError(
+            "File CSV kosong."
+        )
 
     stream = io.TextIOWrapper(
         uploaded_file.file,
@@ -131,21 +155,24 @@ def import_retail_csv(uploaded_file):
         newline="",
     )
 
-    reader = csv.DictReader(stream)
+    try:
+        reader = csv.DictReader(stream)
 
-    columns = set(reader.fieldnames or [])
-
-    if not COMMON_COLUMNS.issubset(columns):
-        raise ValueError(
-            "Kolom CSV tidak sesuai dengan dataset ritel."
+        columns = set(
+            reader.fieldnames or []
         )
 
-    source = detect_source(columns)
+        if not COMMON_COLUMNS.issubset(columns):
+            raise ValueError(
+                "Kolom CSV tidak sesuai dengan dataset ritel."
+            )
 
-    observations = []
-    total_rows = 0
+        source = detect_source(columns)
 
-    try:
+        observations = []
+        total_rows = 0
+        corrected_forecasts = 0
+
         for row in reader:
             total_rows += 1
 
@@ -154,11 +181,16 @@ def import_retail_csv(uploaded_file):
                     "Dataset melebihi batas 100.000 baris."
                 )
 
-            if row.get("Category", "").strip().lower() != "clothing":
+            if (
+                row.get("Category", "")
+                .strip()
+                .lower()
+                != "clothing"
+            ):
                 continue
 
             try:
-                observation = parse_observation(
+                observation, was_corrected = parse_observation(
                     row,
                     source,
                 )
@@ -174,6 +206,9 @@ def import_retail_csv(uploaded_file):
                 ) from exc
 
             observations.append(observation)
+
+            if was_corrected:
+                corrected_forecasts += 1
 
     except UnicodeDecodeError as exc:
         raise ValueError(
@@ -200,5 +235,6 @@ def import_retail_csv(uploaded_file):
         "total_rows": total_rows,
         "imported_rows": len(observations),
         "ignored_rows": total_rows - len(observations),
+        "corrected_forecasts": corrected_forecasts,
         "message": "Dataset berhasil diimpor.",
     }

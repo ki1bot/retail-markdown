@@ -3,15 +3,26 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 def env_bool(name, default=False):
-    value = os.environ.get(name, str(default))
-    return value.lower() in ("true", "1", "yes", "on")
 
+    value = os.environ.get(
+        name,
+        str(default),
+    )
+
+    return value.lower() in (
+        "true",
+        "1",
+        "yes",
+        "on",
+    )
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
-DEBUG = env_bool("DJANGO_DEBUG", False)
+DEBUG = env_bool(
+    "DJANGO_DEBUG",
+    False,
+)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -69,8 +80,17 @@ DATABASES = {
         "NAME": os.environ["POSTGRES_DB"],
         "USER": os.environ["POSTGRES_USER"],
         "PASSWORD": os.environ["POSTGRES_PASSWORD"],
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+
+        "HOST": os.environ.get(
+            "POSTGRES_HOST",
+            "localhost",
+        ),
+
+        "PORT": os.environ.get(
+            "POSTGRES_PORT",
+            "5432",
+        ),
+
         "CONN_MAX_AGE": 60,
         "CONN_HEALTH_CHECKS": True,
     }
@@ -78,16 +98,28 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "UserAttributeSimilarityValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "MinimumLengthValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "CommonPasswordValidator"
+        ),
     },
     {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+        "NAME": (
+            "django.contrib.auth.password_validation."
+            "NumericPasswordValidator"
+        ),
     },
 ]
 

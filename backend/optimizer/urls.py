@@ -2,11 +2,13 @@ from django.urls import path
 
 from .views import (
     DatasetStatusView,
+    ElasticityEstimateView,
     HealthView,
     HistoryView,
     ImportView,
     OptimizeView,
     SummaryView,
+    WarehouseSummaryView,
     csrf_view,
 )
 
@@ -31,6 +33,16 @@ urlpatterns = [
         "data/summary/",
         SummaryView.as_view(),
         name="data-summary",
+    ),
+    path(
+        "data/elasticity/",
+        ElasticityEstimateView.as_view(),
+        name="data-elasticity",
+    ),
+    path(
+        "data/warehouse-summary/",
+        WarehouseSummaryView.as_view(),
+        name="warehouse-summary",
     ),
     path(
         "data/import/",

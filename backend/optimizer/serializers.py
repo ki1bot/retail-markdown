@@ -2,7 +2,6 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-
 class SimulationSerializer(serializers.Serializer):
     stock = serializers.IntegerField(
         min_value=1,
@@ -42,7 +41,10 @@ class SimulationSerializer(serializers.Serializer):
     )
 
     source = serializers.ChoiceField(
-        choices=["sales", "inventory"],
+        choices=[
+            "sales",
+            "inventory",
+        ],
     )
 
     year = serializers.IntegerField(

@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.db import models
 
-
 class SimulationRun(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -19,7 +18,6 @@ class SimulationRun(models.Model):
 
     def __str__(self):
         return f"Simulasi #{self.pk}"
-
 
 class RetailObservation(models.Model):
     SOURCE_CHOICES = [
@@ -68,3 +66,51 @@ class RetailObservation(models.Model):
             f"{self.source} - {self.product_id} - "
             f"{self.observed_on}"
         )
+
+class WarehouseSaleObservation(models.Model):
+    year = models.PositiveSmallIntegerField()
+    month = models.PositiveSmallIntegerField()
+    supplier = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+    item_code = models.CharField(max_length=40)
+    item_description = models.CharField(max_length=120)
+    item_type = models.CharField(max_length=40)
+    retail_sales = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    retail_transfers = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+    )
+    warehouse_sales = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+    )
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["year", "month"],
+                name="whs_year_month_idx",
+            ),
+            models.Index(
+                fields=["item_type"],
+                name="whs_item_type_idx",
+            ),
+            models.Index(
+                fields=["supplier"],
+                name="whs_supplier_idx",
+            ),
+            models.Index(
+                fields=["item_code"],
+                name="whs_item_code_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.year}-{self.month:02d} · {self.item_code}"

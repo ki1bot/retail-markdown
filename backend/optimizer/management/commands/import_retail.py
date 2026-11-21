@@ -1,13 +1,19 @@
 from pathlib import Path
 
 from django.core.files import File
-from django.core.management.base import BaseCommand, CommandError
 
-from optimizer.importer import import_retail_csv
-
+from django.core.management.base import (
+    BaseCommand,
+    CommandError,
+)
+from optimizer.importer import import_dataset_csv
 
 class Command(BaseCommand):
-    help = "Mengimpor dataset CSV ritel ke PostgreSQL."
+
+    help = (
+        "Mengimpor salah satu dataset CSV "
+        "yang didukung ke PostgreSQL."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -15,7 +21,11 @@ class Command(BaseCommand):
             type=Path,
         )
 
-    def handle(self, *args, **options):
+    def handle(
+        self,
+        *args,
+        **options,
+    ):
         csv_path = options["csv_file"]
 
         if not csv_path.is_file():
@@ -30,17 +40,20 @@ class Command(BaseCommand):
                     name=csv_path.name,
                 )
 
-                result = import_retail_csv(
+                result = import_dataset_csv(
                     uploaded_file
                 )
-        except (OSError, ValueError) as exc:
+        except (
+            OSError,
+            ValueError,
+        ) as exc:
             raise CommandError(
                 str(exc)
             ) from exc
 
         self.stdout.write(
             self.style.SUCCESS(
-                "Dataset berhasil diimpor."
+                result["message"]
             )
         )
 
@@ -53,14 +66,23 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(
-            f"Data Clothing: {result['imported_rows']}"
+            f"Berhasil diimpor: {result['imported_rows']}"
         )
 
         self.stdout.write(
-            f"Kategori lain: {result['ignored_rows']}"
+            f"Baris diabaikan: {result['ignored_rows']}"
         )
-
-        self.stdout.write(
-            "Prakiraan negatif disesuaikan: "
-            f"{result['corrected_forecasts']}"
-        )
+        if result["source"] == "warehouse_sales":
+            self.stdout.write(
+                "Supplier kosong: "
+                f"{result['missing_supplier']}"
+            )
+            self.stdout.write(
+                "Retail Sales kosong: "
+                f"{result['missing_retail_sales']}"
+            )
+        else:
+            self.stdout.write(
+                "Forecast negatif disesuaikan: "
+                f"{result['corrected_forecasts']}"
+            )

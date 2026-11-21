@@ -7,14 +7,19 @@ import Dashboard from "./components/Dashboard";
 import DataManager from "./components/DataManager";
 import Simulator from "./components/Simulator";
 import History from "./components/History";
+import WarehouseDashboard from "./components/WarehouseDashboard";
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
+
   const [source, setSource] = useState("sales");
+
   const [year, setYear] = useState(2023);
 
   const [summary, setSummary] = useState(null);
+
   const [loadingSummary, setLoadingSummary] = useState(true);
+
   const [summaryError, setSummaryError] = useState("");
 
   const [reloadKey, setReloadKey] = useState(0);
@@ -24,17 +29,25 @@ export default function App() {
 
     api
       .get(`/data/summary/?source=${source}&year=${year}`)
+
       .then((response) => {
         if (active) {
           setSummary(response);
+
           setSummaryError("");
-          setLoadingSummary(false);
         }
       })
+
       .catch((error) => {
         if (active) {
           setSummary(null);
+
           setSummaryError(error.message);
+        }
+      })
+
+      .finally(() => {
+        if (active) {
           setLoadingSummary(false);
         }
       });
@@ -44,27 +57,56 @@ export default function App() {
     };
   }, [source, year, reloadKey]);
 
+  function handleNavigate(nextPage) {
+    setPage(nextPage);
+  }
+
   function handleSourceChange(value) {
+    if (!["sales", "inventory"].includes(value)) {
+      return;
+    }
+
     setSource(value);
+
     setSummary(null);
+
     setSummaryError("");
+
     setLoadingSummary(true);
   }
 
   function handleYearChange(value) {
     setYear(value);
+
     setSummary(null);
+
     setSummaryError("");
+
     setLoadingSummary(true);
   }
 
   function handleImport(result) {
-    setSource(result.source);
-    setYear(2023);
-    setSummary(null);
-    setSummaryError("");
-    setLoadingSummary(true);
     setReloadKey((value) => value + 1);
+
+    if (result.source === "warehouse_sales") {
+      setPage("warehouse");
+
+      return;
+    }
+
+    if (["sales", "inventory"].includes(result.source)) {
+      setSource(result.source);
+
+      setYear(2023);
+
+      setSummary(null);
+
+      setSummaryError("");
+
+      setLoadingSummary(true);
+
+      setPage("dashboard");
+    }
   }
 
   let content = null;
@@ -104,6 +146,10 @@ export default function App() {
     );
   }
 
+  if (page === "warehouse") {
+    content = <WarehouseDashboard onOpenData={() => setPage("data")} />;
+  }
+
   if (page === "history") {
     content = <History />;
   }
@@ -122,7 +168,7 @@ export default function App() {
   return (
     <Layout
       page={page}
-      onNavigate={setPage}
+      onNavigate={handleNavigate}
       source={source}
       onSourceChange={handleSourceChange}
       year={year}

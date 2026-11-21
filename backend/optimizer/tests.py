@@ -2,12 +2,23 @@ from datetime import date
 from decimal import Decimal
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase, TestCase
 
-from .importer import import_retail_csv
-from .models import RetailObservation
+from django.test import (
+    SimpleTestCase,
+    TestCase,
+)
+
+from .importer import (
+    import_dataset_csv,
+    import_retail_csv,
+)
+
+from .models import (
+    RetailObservation,
+    WarehouseSaleObservation,
+)
+
 from .services import optimize_discount
-
 
 class SimulationTests(SimpleTestCase):
     def test_reference_scenario(self):
@@ -68,7 +79,6 @@ class SimulationTests(SimpleTestCase):
 
         self.assertIsNone(result)
 
-
 class ImportTests(TestCase):
     def test_import_clothing_only(self):
         content = (
@@ -88,7 +98,9 @@ class ImportTests(TestCase):
             content_type="text/csv",
         )
 
-        result = import_retail_csv(uploaded_file)
+        result = import_retail_csv(
+            uploaded_file
+        )
 
         self.assertEqual(
             result["source"],
@@ -150,7 +162,9 @@ class ImportTests(TestCase):
             content_type="text/csv",
         )
 
-        result = import_retail_csv(uploaded_file)
+        result = import_retail_csv(
+            uploaded_file
+        )
 
         self.assertEqual(
             result["source"],
@@ -179,12 +193,16 @@ class ImportTests(TestCase):
             2,
         )
 
-        first_observation = RetailObservation.objects.get(
-            product_id="P001"
+        first_observation = (
+            RetailObservation.objects.get(
+                product_id="P001"
+            )
         )
 
-        second_observation = RetailObservation.objects.get(
-            product_id="P002"
+        second_observation = (
+            RetailObservation.objects.get(
+                product_id="P002"
+            )
         )
 
         self.assertEqual(
@@ -216,7 +234,10 @@ class ImportTests(TestCase):
             ValueError,
             "Permintaan tidak boleh negatif",
         ):
-            import_retail_csv(uploaded_file)
+
+            import_retail_csv(
+                uploaded_file
+            )
 
         self.assertEqual(
             RetailObservation.objects.count(),
@@ -289,4 +310,231 @@ class ImportTests(TestCase):
         self.assertEqual(
             sales["products"],
             1,
+        )
+
+class WarehouseSalesImportTests(TestCase):
+    def _warehouse_file(self):
+        content = (
+            "YEAR,MONTH,SUPPLIER,ITEM CODE,ITEM DESCRIPTION,"
+            "ITEM TYPE,RETAIL SALES,RETAIL TRANSFERS,WAREHOUSE SALES\n"
+
+            "2020,1,SUPPLIER A,100001,ITEM A,WINE,10.50,2.00,4.00\n"
+
+            "2020,1,,100002,ITEM B,BEER,,-1.00,-3.00\n"
+        )
+
+        return SimpleUploadedFile(
+            "Retail and wherehouse Sale.csv",
+            content.encode("utf-8"),
+            content_type="text/csv",
+        )
+
+    def test_import_warehouse_sales_preserves_null_and_negative_values(self):
+        result = import_dataset_csv(
+            self._warehouse_file()
+        )
+
+        self.assertEqual(
+            result["source"],
+            "warehouse_sales",
+        )
+
+        self.assertEqual(
+            result["total_rows"],
+            2,
+        )
+
+        self.assertEqual(
+            result["imported_rows"],
+            2,
+        )
+
+        self.assertEqual(
+            result["missing_supplier"],
+            1,
+        )
+
+        self.assertEqual(
+            result["missing_retail_sales"],
+            1,
+        )
+
+        self.assertEqual(
+            WarehouseSaleObservation.objects.count(),
+            2,
+        )
+
+        second = WarehouseSaleObservation.objects.get(
+            item_code="100002"
+        )
+
+        self.assertIsNone(
+            second.retail_sales
+        )
+
+        self.assertEqual(
+            second.retail_transfers,
+            Decimal("-1.00"),
+        )
+
+        self.assertEqual(
+            second.warehouse_sales,
+            Decimal("-3.00"),
+        )
+
+    def test_warehouse_import_does_not_delete_clothing_observations(self):
+        RetailObservation.objects.create(
+            source="sales",
+            observed_on=date(2023, 1, 1),
+            store_id="S001",
+            product_id="P001",
+            category="Clothing",
+            region="North",
+            inventory_level=100,
+            units_sold=20,
+            units_ordered=30,
+            demand_value=Decimal("25.00"),
+            price=Decimal("71.49"),
+            discount=15,
+            seasonality="Summer",
+            promotion=True,
+        )
+
+        import_dataset_csv(
+            self._warehouse_file()
+        )
+
+        self.assertEqual(
+            RetailObservation.objects.count(),
+            1,
+        )
+
+        self.assertEqual(
+            WarehouseSaleObservation.objects.count(),
+            2,
+        )
+
+    def test_warehouse_summary_endpoint(self):
+        import_dataset_csv(
+            self._warehouse_file()
+        )
+
+        response = self.client.get(
+            "/api/data/warehouse-summary/?year=2020"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        payload = response.json()
+
+        self.assertTrue(
+            payload["available"]
+        )
+
+        self.assertEqual(
+            payload["rows"],
+            2,
+        )
+
+        self.assertEqual(
+            payload["suppliers_count"],
+            1,
+        )
+
+        self.assertEqual(
+            payload["products_count"],
+            2,
+        )
+
+        self.assertEqual(
+            payload["quality"]["missing_retail_sales"],
+            1,
+        )
+
+    def test_dataset_status_contains_warehouse_source(self):
+        response = self.client.get(
+            "/api/data/status/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertIn(
+            "warehouse_sales",
+            response.json()["datasets"],
+        )
+
+        self.assertEqual(
+            response.json()["datasets"]["warehouse_sales"]["rows"],
+            0,
+        )
+
+class ElasticityEstimateTests(TestCase):
+    def test_elasticity_endpoint_returns_log_log_diagnostic(self):
+        observations = [
+            (Decimal("10.00"), 0, 40),
+            (Decimal("20.00"), 0, 30),
+            (Decimal("30.00"), 0, 20),
+            (Decimal("40.00"), 0, 10),
+        ]
+
+        for index, (
+            price,
+            discount,
+            units_sold,
+        ) in enumerate(observations):
+
+            RetailObservation.objects.create(
+                source="sales",
+                observed_on=date(
+                    2023,
+                    1,
+                    index + 1,
+                ),
+                store_id="S001",
+                product_id=f"P{index:03d}",
+                category="Clothing",
+                region="North",
+                inventory_level=100,
+                units_sold=units_sold,
+                units_ordered=30,
+                demand_value=Decimal(units_sold),
+                price=price,
+                discount=discount,
+                seasonality="Winter",
+                promotion=False,
+            )
+
+        response = self.client.get(
+            "/api/data/elasticity/?source=sales&year=2023"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        payload = response.json()
+
+        self.assertTrue(
+            payload["available"]
+        )
+
+        self.assertEqual(
+            payload["sample_size"],
+            4,
+        )
+
+        self.assertLess(
+            payload["elasticity_estimate"],
+            0,
+        )
+
+        self.assertFalse(
+            payload["used_automatically"]
         )

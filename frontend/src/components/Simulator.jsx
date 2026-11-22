@@ -7,7 +7,7 @@ import { formatNumber } from "../lib/format";
 const baseline = {
   stock: "30000",
 
-  price: "71.491646",
+  price: "71.4916455479",
 
   weekly_average: "10523",
 
@@ -21,69 +21,45 @@ const baseline = {
 const fields = [
   {
     name: "stock",
-
     label: "Stok yang akan dihabiskan",
-
     min: "1",
-
     max: "1000000",
-
     step: "1",
-
     help: "Jumlah stok awal untuk skenario markdown.",
   },
 
   {
     name: "price",
-
     label: "Harga referensi rata-rata",
-
     min: "0.000001",
-
-    step: "0.000001",
-
-    help: "Rata-rata Price Retail Sales kategori Clothing.",
+    step: "0.0000000001",
+    help: "Rata-rata Price Retail Sales kategori Clothing dengan presisi perhitungan.",
   },
 
   {
     name: "weekly_average",
-
     label: "Rata-rata unit terjual per minggu",
-
     min: "1",
-
     max: "1000000",
-
     step: "1",
-
     help: "Dihitung dari total Units Sold 2023 dibagi rentang hari, dikali tujuh.",
   },
 
   {
     name: "demand_ratio",
-
     label: "Rasio permintaan dasar",
-
     min: "0.10",
-
     max: "2.00",
-
     step: "0.01",
-
     help: "Proporsi rata-rata penjualan mingguan sebagai permintaan dasar.",
   },
 
   {
     name: "hpp_ratio",
-
     label: "Rasio harga pokok (HPP)",
-
     min: "0.00",
-
     max: "1.00",
-
     step: "0.01",
-
     help: "Proporsi HPP terhadap harga referensi.",
   },
 ];

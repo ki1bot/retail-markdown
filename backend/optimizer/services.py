@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, ROUND_HALF_EVEN
 from itertools import product
 
 DISCOUNT_OPTIONS = (0, 5, 10, 15, 20, 25)
@@ -16,7 +16,7 @@ def round_money(value):
     return str(
         value.quantize(
             Decimal("0.01"),
-            rounding=ROUND_HALF_UP,
+            rounding=ROUND_HALF_EVEN,
         )
     )
 
@@ -33,6 +33,7 @@ def calculate_plan(
     schedule = []
 
     hpp = price * hpp_ratio
+    elasticity_magnitude = abs(elasticity)
 
     for week, discount in enumerate(
         plan,
@@ -40,7 +41,8 @@ def calculate_plan(
     ):
 
         discount_rate = (
-            Decimal(discount) / Decimal("100")
+            Decimal(discount)
+            / Decimal("100")
         )
 
         price_factor = (
@@ -48,8 +50,11 @@ def calculate_plan(
         )
 
         demand = round_units(
-            base_demand /
-            (price_factor ** abs(elasticity))
+            base_demand
+            / (
+                price_factor
+                ** elasticity_magnitude
+            )
         )
 
         sold = min(
@@ -76,9 +81,15 @@ def calculate_plan(
         schedule.append({
             "week": week,
             "discount": discount,
+            "selling_price": round_money(
+                selling_price
+            ),
             "demand": demand,
             "sold": sold,
             "remaining": remaining,
+            "unit_margin": round_money(
+                margin
+            ),
             "profit": round_money(
                 weekly_profit
             ),
@@ -101,8 +112,8 @@ def optimize_discount(data):
     elasticity = data["elasticity"]
 
     base_demand = (
-        Decimal(weekly_average) *
-        demand_ratio
+        Decimal(weekly_average)
+        * demand_ratio
     )
 
     best_plan = None
@@ -137,7 +148,7 @@ def optimize_discount(data):
 
     if best_plan is None:
         return None
-    
+
     fixed_plan = calculate_plan(
         (20, 20, 20, 20),
         stock,
@@ -158,9 +169,9 @@ def optimize_discount(data):
 
         if fixed_plan["total_profit_raw"] != 0:
             improvement_percent = (
-                improvement /
-                abs(fixed_plan["total_profit_raw"]) *
-                Decimal("100")
+                improvement
+                / abs(fixed_plan["total_profit_raw"])
+                * Decimal("100")
             )
 
     return {
@@ -173,7 +184,8 @@ def optimize_discount(data):
         ),
 
         "tested_plans": (
-            len(DISCOUNT_OPTIONS) ** TARGET_WEEKS
+            len(DISCOUNT_OPTIONS)
+            ** TARGET_WEEKS
         ),
 
         "feasible_plans": feasible_plans,

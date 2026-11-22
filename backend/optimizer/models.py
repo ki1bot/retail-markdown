@@ -11,7 +11,10 @@ class SimulationRun(models.Model):
     )
     input_data = models.JSONField()
     result_data = models.JSONField()
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -30,10 +33,23 @@ class RetailObservation(models.Model):
         choices=SOURCE_CHOICES,
     )
     observed_on = models.DateField()
-    store_id = models.CharField(max_length=40)
-    product_id = models.CharField(max_length=40)
-    category = models.CharField(max_length=40)
-    region = models.CharField(max_length=40)
+
+    store_id = models.CharField(
+        max_length=40
+    )
+
+    product_id = models.CharField(
+        max_length=40
+    )
+
+    category = models.CharField(
+        max_length=40
+    )
+
+    region = models.CharField(
+        max_length=40
+    )
+
     inventory_level = models.PositiveIntegerField()
     units_sold = models.PositiveIntegerField()
     units_ordered = models.PositiveIntegerField()
@@ -46,24 +62,63 @@ class RetailObservation(models.Model):
         decimal_places=2,
     )
     discount = models.PositiveSmallIntegerField()
-    seasonality = models.CharField(max_length=40)
-    promotion = models.BooleanField(default=False)
+
+    seasonality = models.CharField(
+        max_length=40
+    )
+
+    promotion = models.BooleanField(
+        default=False
+    )
+
+    weather_condition = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+    )
+
+    competitor_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    epidemic = models.BooleanField(
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         indexes = [
             models.Index(
-                fields=["source", "observed_on"],
+                fields=[
+                    "source",
+                    "observed_on",
+                ],
                 name="opt_obs_src_date_idx",
             ),
             models.Index(
-                fields=["source", "discount"],
+                fields=[
+                    "source",
+                    "discount",
+                ],
                 name="opt_obs_src_disc_idx",
+            ),
+            models.Index(
+                fields=[
+                    "source",
+                    "product_id",
+                    "observed_on",
+                ],
+                name="opt_obs_product_date_idx",
             ),
         ]
 
     def __str__(self):
         return (
-            f"{self.source} - {self.product_id} - "
+            f"{self.source} - "
+            f"{self.product_id} - "
             f"{self.observed_on}"
         )
 
@@ -75,9 +130,19 @@ class WarehouseSaleObservation(models.Model):
         blank=True,
         default="",
     )
-    item_code = models.CharField(max_length=40)
-    item_description = models.CharField(max_length=120)
-    item_type = models.CharField(max_length=40)
+
+    item_code = models.CharField(
+        max_length=40
+    )
+
+    item_description = models.CharField(
+        max_length=120
+    )
+
+    item_type = models.CharField(
+        max_length=40
+    )
+
     retail_sales = models.DecimalField(
         max_digits=18,
         decimal_places=2,
@@ -92,10 +157,14 @@ class WarehouseSaleObservation(models.Model):
         max_digits=18,
         decimal_places=2,
     )
+
     class Meta:
         indexes = [
             models.Index(
-                fields=["year", "month"],
+                fields=[
+                    "year",
+                    "month",
+                ],
                 name="whs_year_month_idx",
             ),
             models.Index(
@@ -113,4 +182,7 @@ class WarehouseSaleObservation(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.year}-{self.month:02d} · {self.item_code}"
+        return (
+            f"{self.year}-{self.month:02d} "
+            f"· {self.item_code}"
+        )

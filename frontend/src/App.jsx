@@ -12,7 +12,7 @@ import WarehouseDashboard from "./components/WarehouseDashboard";
 export default function App() {
   const [page, setPage] = useState("dashboard");
 
-  const [source, setSource] = useState("sales");
+  const [source, setSource] = useState("inventory");
 
   const [year, setYear] = useState(2023);
 
@@ -58,6 +58,36 @@ export default function App() {
   }, [source, year, reloadKey]);
 
   function handleNavigate(nextPage) {
+    let nextSource = source;
+
+    let nextYear = year;
+
+    if (nextPage === "dashboard") {
+      nextSource = "inventory";
+    }
+
+    if (nextPage === "analysis") {
+      nextSource = "sales";
+    }
+
+    if (nextPage === "simulator") {
+      nextSource = "sales";
+
+      nextYear = 2023;
+    }
+
+    if (nextSource !== source || nextYear !== year) {
+      setLoadingSummary(true);
+
+      setSummary(null);
+
+      setSummaryError("");
+    }
+
+    setSource(nextSource);
+
+    setYear(nextYear);
+
     setPage(nextPage);
   }
 
@@ -68,6 +98,8 @@ export default function App() {
 
     setSource(value);
 
+    setPage(value === "inventory" ? "dashboard" : "analysis");
+
     setSummary(null);
 
     setSummaryError("");
@@ -76,6 +108,10 @@ export default function App() {
   }
 
   function handleYearChange(value) {
+    if (page === "simulator") {
+      setPage("analysis");
+    }
+
     setYear(value);
 
     setSummary(null);
@@ -86,6 +122,12 @@ export default function App() {
   }
 
   function handleImport(result) {
+    setLoadingSummary(true);
+
+    setSummary(null);
+
+    setSummaryError("");
+
     setReloadKey((value) => value + 1);
 
     if (result.source === "warehouse_sales") {
@@ -105,7 +147,7 @@ export default function App() {
 
       setLoadingSummary(true);
 
-      setPage("dashboard");
+      setPage(result.source === "sales" ? "analysis" : "dashboard");
     }
   }
 
@@ -117,6 +159,7 @@ export default function App() {
         summary={summary}
         loading={loadingSummary}
         error={summaryError}
+        source={source}
         mode="dashboard"
         onOpenData={() => setPage("data")}
       />
@@ -129,6 +172,7 @@ export default function App() {
         summary={summary}
         loading={loadingSummary}
         error={summaryError}
+        source={source}
         mode="analysis"
         onOpenData={() => setPage("data")}
       />
@@ -136,14 +180,7 @@ export default function App() {
   }
 
   if (page === "simulator") {
-    content = (
-      <Simulator
-        key={`${source}-${year}-${summary?.rows || 0}`}
-        source={source}
-        year={year}
-        summary={summary}
-      />
-    );
+    content = <Simulator onOpenData={() => setPage("data")} />;
   }
 
   if (page === "warehouse") {

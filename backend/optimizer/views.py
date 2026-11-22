@@ -1130,12 +1130,6 @@ class WarehouseSummaryView(APIView):
                     for item in monthly
                 ],
             },
-
-            "interpretation_note": (
-                "Dataset tidak menyediakan metadata mata uang "
-                "atau satuan fisik. Angka ditampilkan sesuai "
-                "nilai numerik pada file sumber."
-            ),
         })
 
 @method_decorator(

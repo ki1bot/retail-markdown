@@ -3,27 +3,22 @@ const navigation = [
     id: "dashboard",
     label: "Ringkasan Clothing",
   },
-
   {
     id: "analysis",
     label: "Analisis Penjualan",
   },
-
   {
     id: "simulator",
     label: "Simulasi Diskon",
   },
-
   {
     id: "warehouse",
     label: "Retail & Warehouse Sales",
   },
-
   {
     id: "history",
     label: "Riwayat Simulasi",
   },
-
   {
     id: "data",
     label: "Kelola Dataset",
@@ -31,49 +26,31 @@ const navigation = [
 ];
 
 const titles = {
-  dashboard: "Ringkasan penjualan pakaian",
-
+  dashboard: "Ringkasan inventori pakaian",
   analysis: "Analisis data penjualan pakaian",
-
   simulator: "Simulasi optimasi diskon mingguan",
-
   warehouse: "Analisis Retail & Warehouse Sales",
-
   history: "Riwayat simulasi diskon",
-
   data: "Kelola tiga sumber dataset",
 };
 
 const subtitles = {
   dashboard: "Retail Inventory · Clothing",
-
   analysis: "Retail Sales · Clothing",
-
-  simulator: "Dynamic Markdown Price Optimization · " + "Horizon empat minggu",
-
-  warehouse:
-    "Analisis dataset tambahan · " + "Terpisah dari model optimasi pakaian",
-
+  simulator: "Dynamic Markdown Price Optimization · Horizon empat minggu",
+  warehouse: "Analisis dataset tambahan · Terpisah dari model optimasi pakaian",
   history: "Dua puluh hasil simulasi terbaru",
-
   data: "Impor dan pantau sumber data yang digunakan aplikasi",
 };
 
 export default function Layout({
   page,
-
   onNavigate,
-
   source,
-
   onSourceChange,
-
   year,
-
   onYearChange,
-
   availableYears,
-
   children,
 }) {
   const years = availableYears.length ? availableYears : [2022, 2023, 2024];
@@ -81,6 +58,11 @@ export default function Layout({
   const showClothingFilters = ["dashboard", "analysis", "simulator"].includes(
     page,
   );
+
+  const pageTitle =
+    page === "dashboard" && source === "sales"
+      ? "Ringkasan penjualan pakaian"
+      : titles[page];
 
   return (
     <div className="min-h-screen w-full bg-[#09090b] text-zinc-100">
@@ -124,7 +106,7 @@ export default function Layout({
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-white">
-                  {titles[page]}
+                  {pageTitle}
                 </h2>
 
                 <p className="mt-1 text-xs text-zinc-500">{subtitles[page]}</p>
@@ -155,9 +137,7 @@ export default function Layout({
                       className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500"
                     >
                       {[...new Set([...years, year])]
-
                         .sort((a, b) => a - b)
-
                         .map((value) => (
                           <option key={value} value={value}>
                             {value}

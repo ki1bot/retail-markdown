@@ -489,23 +489,6 @@ export default function WarehouseDashboard({ onOpenData }) {
 
         <div className="mt-4 space-y-2 text-sm leading-6 text-zinc-400">
           <p>{summary.interpretation_note}</p>
-
-          <p>
-            Dataset yang tersedia mencatat bulan{" "}
-            {monthsLabel || "yang tercantum pada file"}. Bulan yang tidak muncul
-            tidak dianggap bernilai nol.
-          </p>
-
-          <p>
-            Nilai negatif dipertahankan sebagai data sumber karena dapat
-            menunjukkan koreksi atau penyesuaian transaksi. Retail Sales kosong
-            disimpan sebagai NULL.
-          </p>
-
-          <p>
-            Modul ini merupakan analisis dataset tambahan dan tidak digunakan
-            untuk menghitung elastisitas harga atau rekomendasi diskon pakaian.
-          </p>
         </div>
       </Panel>
     </div>

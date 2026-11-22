@@ -1,8 +1,8 @@
+import logging
+from collections import defaultdict
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from math import ceil
-
-from django.db.models import Avg, Count, Min, Sum
-from django.db.models.functions import ExtractMonth, ExtractYear
 
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -11,326 +11,482 @@ from rest_framework.views import APIView
 
 from .models import RetailObservation
 
+logger = logging.getLogger(__name__)
+
+ZERO = Decimal("0")
+
 class SummaryView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        source = request.query_params.get("source", "sales")
+        source = request.query_params.get(
+            "source",
+            "sales",
+        ).strip().lower()
 
-        if source not in ("sales", "inventory"):
+        if source not in {"sales", "inventory"}:
             return Response(
-                {"detail": "Sumber data tidak valid."},
+                {
+                    "detail": (
+                        "Sumber data tidak valid. "
+                        "Gunakan sales atau inventory."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            year = int(request.query_params.get("year", "2023"))
+            year = int(
+                request.query_params.get(
+                    "year",
+                    "2023",
+                )
+            )
+
         except (TypeError, ValueError):
             return Response(
-                {"detail": "Tahun tidak valid."},
+                {
+                    "detail": "Tahun tidak valid."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if year < 2020 or year > 2035:
+        if not 2020 <= year <= 2035:
             return Response(
-                {"detail": "Tahun di luar rentang yang diizinkan."},
+                {
+                    "detail": (
+                        "Tahun harus berada pada "
+                        "rentang 2020–2035."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        source_queryset = RetailObservation.objects.filter(
-            source=source,
-            category__iexact="Clothing",
-        )
-
-        available_years = list(
-            source_queryset
-            .annotate(observation_year=ExtractYear("observed_on"))
-            .values_list("observation_year", flat=True)
-            .distinct()
-            .order_by("observation_year")
-        )
-
-        queryset = source_queryset.filter(
-            observed_on__year=year
-        )
-
-        totals = queryset.aggregate(
-            rows=Count("id"),
-            sold=Sum("units_sold"),
-            demand=Sum("demand_value"),
-            average_price=Avg("price"),
-            average_inventory=Avg("inventory_level"),
-            stores=Count("store_id", distinct=True),
-            products=Count("product_id", distinct=True),
-            first_date=Min("observed_on"),
-            last_date=Max("observed_on"),
-        )
-
-        if not totals["rows"]:
-            return Response({
-                "available": False,
-                "source": source,
-                "year": year,
-                "available_years": available_years,
-                "rows": 0,
-                "sold": 0,
-                "demand": 0,
-                "average_price": "0.000000",
-                "average_inventory": 0,
-                "weekly_average": 0,
-                "stores": 0,
-                "products_count": 0,
-                "first_date": None,
-                "last_date": None,
-                "monthly": [],
-                "discounts": [],
-                "products": [],
-                "scatter_points": [],
-                "scatter_total_rows": 0,
-            })
-
-        sold_total = int(totals["sold"] or 0)
-        demand_total = totals["demand"] or Decimal("0")
-
-        first_date = totals["first_date"]
-        last_date = totals["last_date"]
-
-        covered_days = (last_date - first_date).days + 1
-
-        weekly_average = 0
-
-        if covered_days > 0:
-            weekly_average = int(
-                (
-                    Decimal(sold_total)
-                    * Decimal("7")
-                    / Decimal(covered_days)
-                ).quantize(
-                    Decimal("1"),
-                    rounding=ROUND_HALF_UP,
+        try:
+            base_queryset = (
+                RetailObservation.objects.filter(
+                    source=source,
+                    category__iexact="Clothing",
                 )
             )
 
-        average_price = (
-            totals["average_price"] or Decimal("0")
-        )
-
-        average_price = average_price.quantize(
-            Decimal("0.0000000001"),
-            rounding=ROUND_HALF_UP,
-        )
-
-        average_inventory = (
-            totals["average_inventory"] or Decimal("0")
-        )
-
-        monthly_rows = (
-            queryset
-            .annotate(month=ExtractMonth("observed_on"))
-            .values("month")
-            .annotate(
-                sold=Sum("units_sold"),
-                demand=Sum("demand_value"),
-            )
-            .order_by("month")
-        )
-
-        monthly_lookup = {
-            item["month"]: item
-            for item in monthly_rows
-        }
-
-        monthly = []
-
-        for month in range(1, 13):
-            item = monthly_lookup.get(month, {})
-
-            month_sold = int(item.get("sold") or 0)
-
-            month_demand = (
-                item.get("demand") or Decimal("0")
+            all_dates = list(
+                base_queryset.values_list(
+                    "observed_on",
+                    flat=True,
+                )
             )
 
-            monthly.append({
-                "month": month,
-                "sold": month_sold,
-                "demand": float(month_demand),
-                "gap": float(
-                    month_demand - Decimal(month_sold)
-                ),
-                "sales_growth_pct": None,
-                "inventory_end_stock": 0,
+            available_years = sorted({
+                item.year
+                for item in all_dates
+                if item is not None
             })
 
-        previous_sold = None
+            start_date = date(year, 1, 1)
 
-        for item in monthly:
-            if previous_sold is not None and previous_sold > 0:
-                item["sales_growth_pct"] = round(
-                    (
-                        (item["sold"] - previous_sold)
-                        / previous_sold
-                    ) * 100,
-                    2,
+            end_date = date(year + 1, 1, 1)
+
+            rows = list(
+                base_queryset.filter(
+                    observed_on__gte=start_date,
+                    observed_on__lt=end_date,
                 )
-
-            previous_sold = item["sold"]
-
-        if source == "inventory":
-
-            latest_stock_by_pair = {}
-
-            stock_rows = (
-                queryset
                 .order_by(
+                    "observed_on",
                     "store_id",
                     "product_id",
-                    "observed_on",
                     "id",
                 )
                 .values_list(
                     "observed_on",
                     "store_id",
                     "product_id",
+                    "units_sold",
+                    "demand_value",
+                    "price",
                     "inventory_level",
+                    "discount",
                 )
             )
 
-            for (
-                observed_on,
-                store_id,
-                product_id,
-                inventory_level,
-            ) in stock_rows:
+            if not rows:
+                return Response({
+                    "available": False,
+                    "source": source,
+                    "year": year,
+                    "available_years": available_years,
+                    "rows": 0,
+                    "sold": 0,
+                    "demand": 0.0,
+                    "average_price": "0.0000000000",
+                    "average_inventory": 0.0,
+                    "weekly_average": 0,
+                    "stores": 0,
+                    "products_count": 0,
+                    "first_date": None,
+                    "last_date": None,
+                    "monthly": [],
+                    "discounts": [],
+                    "products": [],
+                    "scatter_points": [],
+                    "scatter_total_rows": 0,
+                })
 
-                key = (
-                    observed_on.month,
+            row_count = len(rows)
+
+            first_date = min(
+                row[0] for row in rows
+            )
+
+            last_date = max(
+                row[0] for row in rows
+            )
+
+            covered_days = (
+                last_date - first_date
+            ).days + 1
+
+            total_sold = 0
+
+            total_demand = ZERO
+
+            total_price = ZERO
+
+            total_inventory = ZERO
+
+            stores = set()
+
+            products_seen = set()
+
+            monthly_stats = {
+                month: {
+                    "sold": 0,
+                    "demand": ZERO,
+                }
+                for month in range(1, 13)
+            }
+
+            discount_stats = defaultdict(
+                lambda: {
+                    "rows": 0,
+                    "sold": 0,
+                    "demand": ZERO,
+                }
+            )
+
+            product_stats = defaultdict(
+                lambda: {
+                    "sold": 0,
+                    "rows": 0,
+                }
+            )
+
+            latest_inventory = {}
+
+            for row in rows:
+                (
+                    observed_on,
                     store_id,
                     product_id,
+                    units_sold,
+                    demand_value,
+                    price,
+                    inventory_level,
+                    discount,
+                ) = row
+
+                sold_value = int(
+                    units_sold or 0
                 )
 
-                latest_stock_by_pair[key] = int(
-                    inventory_level
+                demand_value = (
+                    demand_value
+                    if demand_value is not None
+                    else ZERO
                 )
 
-            stock_by_month = {}
-
-            for (
-                month,
-                _store_id,
-                _product_id,
-            ), stock in latest_stock_by_pair.items():
-
-                stock_by_month[month] = (
-                    stock_by_month.get(month, 0) + stock
+                price = (
+                    price
+                    if price is not None
+                    else ZERO
                 )
 
-            for item in monthly:
-                item["inventory_end_stock"] = (
-                    stock_by_month.get(item["month"], 0)
+                inventory_value = int(
+                    inventory_level or 0
                 )
 
-        discount_rows = (
-            queryset
-            .values("discount")
-            .annotate(
-                rows=Count("id"),
-                sold=Sum("units_sold"),
-                demand=Sum("demand_value"),
-                average_sold=Avg("units_sold"),
-                average_demand=Avg("demand_value"),
+                discount_value = int(
+                    discount or 0
+                )
+
+                month = observed_on.month
+
+                total_sold += sold_value
+
+                total_demand += demand_value
+
+                total_price += price
+
+                total_inventory += Decimal(
+                    inventory_value
+                )
+
+                stores.add(store_id)
+
+                products_seen.add(product_id)
+
+                monthly_stats[month]["sold"] += (
+                    sold_value
+                )
+
+                monthly_stats[month]["demand"] += (
+                    demand_value
+                )
+
+                discount_bucket = (
+                    discount_stats[discount_value]
+                )
+
+                discount_bucket["rows"] += 1
+
+                discount_bucket["sold"] += (
+                    sold_value
+                )
+
+                discount_bucket["demand"] += (
+                    demand_value
+                )
+
+                product_bucket = (
+                    product_stats[product_id]
+                )
+
+                product_bucket["sold"] += (
+                    sold_value
+                )
+
+                product_bucket["rows"] += 1
+
+                if source == "inventory":
+                    stock_key = (
+                        month,
+                        store_id,
+                        product_id,
+                    )
+
+                    current = latest_inventory.get(
+                        stock_key
+                    )
+
+                    if (
+                        current is None
+                        or observed_on >= current[0]
+                    ):
+                        latest_inventory[stock_key] = (
+                            observed_on,
+                            inventory_value,
+                        )
+
+            weekly_average = 0
+
+            if covered_days > 0:
+                weekly_average = int(
+                    (
+                        Decimal(total_sold)
+                        * Decimal("7")
+                        / Decimal(covered_days)
+                    ).quantize(
+                        Decimal("1"),
+                        rounding=ROUND_HALF_UP,
+                    )
+                )
+
+            average_price = (
+                total_price
+                / Decimal(row_count)
+            ).quantize(
+                Decimal("0.0000000001"),
+                rounding=ROUND_HALF_UP,
             )
-            .order_by("discount")
-        )
+            average_inventory = float(
+                (
+                    total_inventory
+                    / Decimal(row_count)
+                ).quantize(
+                    Decimal("0.01"),
+                    rounding=ROUND_HALF_UP,
+                )
+            )
+            inventory_by_month = defaultdict(int)
 
-        discounts = [
-            {
-                "discount": item["discount"],
-                "rows": item["rows"],
-                "sold": int(item["sold"] or 0),
-                "demand": float(item["demand"] or 0),
-                "average_sold": float(
-                    item["average_sold"] or 0
+            if source == "inventory":
+                for (
+                    month,
+                    _store_id,
+                    _product_id,
+                ), (
+                    _observed_on,
+                    stock,
+                ) in latest_inventory.items():
+                    inventory_by_month[month] += stock
+
+            monthly = []
+
+            previous_sold = None
+
+            for month in range(1, 13):
+                month_sold = (
+                    monthly_stats[month]["sold"]
+                )
+
+                month_demand = (
+                    monthly_stats[month]["demand"]
+                )
+
+                growth = None
+
+                if (
+                    previous_sold is not None
+                    and previous_sold > 0
+                ):
+                    growth = round(
+                        (
+                            (
+                                month_sold
+                                - previous_sold
+                            )
+                            / previous_sold
+                        ) * 100,
+                        2,
+                    )
+
+                monthly.append({
+                    "month": month,
+                    "sold": month_sold,
+                    "demand": float(
+                        month_demand
+                    ),
+
+                    "gap": float(
+                        month_demand
+                        - Decimal(month_sold)
+                    ),
+
+                    "sales_growth_pct": growth,
+
+                    "inventory_end_stock": (
+                        inventory_by_month.get(
+                            month,
+                            0,
+                        )
+                    ),
+                })
+
+                previous_sold = month_sold
+
+            discounts = []
+
+            for discount_value in sorted(
+                discount_stats
+            ):
+                item = discount_stats[
+                    discount_value
+                ]
+
+                count = item["rows"]
+
+                discounts.append({
+                    "discount": discount_value,
+                    "rows": count,
+                    "sold": item["sold"],
+                    "demand": float(
+                        item["demand"]
+                    ),
+
+                    "average_sold": (
+                        item["sold"] / count
+                        if count
+                        else 0.0
+                    ),
+
+                    "average_demand": (
+                        float(
+                            item["demand"]
+                            / Decimal(count)
+                        )
+                        if count
+                        else 0.0
+                    ),
+                })
+
+            products = [
+                {
+                    "product_id": product_id,
+                    "sold": item["sold"],
+                    "rows": item["rows"],
+                }
+
+                for product_id, item in sorted(
+                    product_stats.items(),
+                    key=lambda pair: (
+                        -pair[1]["sold"],
+                        pair[0],
+                    ),
+                )[:10]
+            ]
+            sample_step = max(
+                1,
+                ceil(row_count / 1500),
+            )
+
+            scatter_points = [
+                {
+                    "price": float(row[5]),
+                    "discount": int(row[7]),
+                    "units_sold": int(row[3]),
+                }
+                for row in rows[::sample_step]
+            ]
+
+            return Response({
+                "available": True,
+                "source": source,
+                "year": year,
+                "available_years": available_years,
+                "rows": row_count,
+                "sold": total_sold,
+                "demand": float(total_demand),
+                "average_price": str(
+                    average_price
                 ),
-                "average_demand": float(
-                    item["average_demand"] or 0
-                ),
-            }
-            for item in discount_rows
-        ]
+                "average_inventory": average_inventory,
+                "weekly_average": weekly_average,
+                "stores": len(stores),
+                "products_count": len(products_seen),
+                "first_date": first_date.isoformat(),
+                "last_date": last_date.isoformat(),
+                "monthly": monthly,
+                "discounts": discounts,
+                "products": products,
+                "scatter_points": scatter_points,
+                "scatter_total_rows": row_count,
+            })
 
-        product_rows = (
-            queryset
-            .values("product_id")
-            .annotate(
-                sold=Sum("units_sold"),
-                rows=Count("id"),
+        except Exception:
+            logger.exception(
+                "Gagal membangun ringkasan retail: "
+                "source=%s year=%s",
+                source,
+                year,
             )
-            .order_by("-sold", "product_id")[:10]
-        )
 
-        products = [
-            {
-                "product_id": item["product_id"],
-                "sold": int(item["sold"] or 0),
-                "rows": item["rows"],
-            }
-            for item in product_rows
-        ]
-
-        scatter_rows = list(
-            queryset
-            .order_by(
-                "observed_on",
-                "store_id",
-                "product_id",
-                "id",
+            return Response(
+                {
+                    "detail": (
+                        "Backend gagal membangun ringkasan dataset. "
+                        "Periksa log layanan backend untuk detail teknis."
+                    )
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-            .values_list(
-                "price",
-                "discount",
-                "units_sold",
-            )
-        )
-
-        scatter_total_rows = len(scatter_rows)
-
-        sample_step = max(
-            1,
-            ceil(scatter_total_rows / 1500),
-        )
-
-        scatter_points = [
-            {
-                "price": float(price),
-                "discount": int(discount),
-                "units_sold": int(units_sold),
-            }
-            for price, discount, units_sold
-            in scatter_rows[::sample_step]
-        ]
-
-        return Response({
-            "available": True,
-            "source": source,
-            "year": year,
-            "available_years": available_years,
-            "rows": totals["rows"],
-            "sold": sold_total,
-            "demand": float(demand_total),
-            "average_price": str(average_price),
-            "average_inventory": round(
-                float(average_inventory),
-                2,
-            ),
-            "weekly_average": weekly_average,
-            "stores": totals["stores"],
-            "products_count": totals["products"],
-            "first_date": first_date.isoformat(),
-            "last_date": last_date.isoformat(),
-            "monthly": monthly,
-            "discounts": discounts,
-            "products": products,
-            "scatter_points": scatter_points,
-            "scatter_total_rows": scatter_total_rows,
-        })

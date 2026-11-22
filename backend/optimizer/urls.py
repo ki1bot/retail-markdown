@@ -1,5 +1,6 @@
 from django.urls import path
 from .summary import SummaryView
+from .warehouse_summary import WarehouseSummaryView
 
 from .views import (
     DatasetStatusView,
@@ -8,7 +9,6 @@ from .views import (
     HistoryView,
     ImportView,
     OptimizeView,
-    WarehouseSummaryView,
     csrf_view,
 )
 

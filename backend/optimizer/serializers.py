@@ -1,53 +1,46 @@
-from decimal import Decimal
-
 from rest_framework import serializers
 
-class SimulationSerializer(serializers.Serializer):
+class OptimizationInputSerializer(serializers.Serializer):
     stock = serializers.IntegerField(
         min_value=1,
-        max_value=1000000,
+        max_value=1_000_000,
     )
 
-    price = serializers.DecimalField(
-        max_digits=18,
-        decimal_places=10,
-        min_value=Decimal("0.000001"),
+    reference_price = serializers.FloatField(
+        min_value=0.000001,
+        max_value=1_000_000_000,
     )
 
-    weekly_average = serializers.IntegerField(
+    unit_cost_ratio = serializers.FloatField(
+        min_value=0.0,
+        max_value=0.99,
+    )
+
+    weekly_average_units_sold = serializers.FloatField(
         min_value=1,
-        max_value=1000000,
+        max_value=1_000_000,
     )
 
-    demand_ratio = serializers.DecimalField(
-        max_digits=4,
-        decimal_places=2,
-        min_value=Decimal("0.10"),
-        max_value=Decimal("2.00"),
+    demand_ratio = serializers.FloatField(
+        min_value=0.1,
+        max_value=2.0,
     )
 
-    hpp_ratio = serializers.DecimalField(
-        max_digits=4,
-        decimal_places=2,
-        min_value=Decimal("0.00"),
-        max_value=Decimal("1.00"),
+    elasticity = serializers.FloatField(
+        min_value=-5.0,
+        max_value=-0.1,
     )
 
-    elasticity = serializers.DecimalField(
-        max_digits=3,
-        decimal_places=1,
-        min_value=Decimal("-2.5"),
-        max_value=Decimal("-1.5"),
+    weeks = serializers.IntegerField(
+        min_value=1,
+        max_value=6,
     )
 
-    source = serializers.ChoiceField(
-        choices=[
-            "sales",
-            "inventory",
-        ],
-    )
-
-    year = serializers.IntegerField(
-        min_value=2020,
-        max_value=2035,
+    discount_options = serializers.ListField(
+        child=serializers.IntegerField(
+            min_value=0,
+            max_value=80,
+        ),
+        min_length=2,
+        max_length=10,
     )

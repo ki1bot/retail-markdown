@@ -25,9 +25,12 @@ services:
     network_mode: "service:database"
     env_file:
       - .env
+    environment:
+      DATASET_DIR: /data
     volumes:
       - ./backend:/app
-      - ./data:/data:ro
+      - ./data:/data
+
     depends_on:
       database:
         condition: service_healthy
@@ -36,7 +39,8 @@ services:
       gunicorn config.wsgi:application
       --bind 0.0.0.0:8000
       --workers 2
-      --timeout 30"
+      --timeout 180"
+
     healthcheck:
       test:
         - CMD

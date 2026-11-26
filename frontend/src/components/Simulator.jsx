@@ -1,140 +1,66 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-
 import { formatNumber } from "../lib/format";
 
-const baseline = {
-  stock: "30000",
+import StatCard from "./common/StatCard";
+import Panel from "./common/Panel";
+import StatusTag from "./common/StatusTag";
 
-  price: "71.4916455479",
-
-  weekly_average: "10523",
-
-  demand_ratio: "0.50",
-
-  hpp_ratio: "0.60",
-
-  elasticity: "-2.0",
+const initialForm = {
+  stock: 30000,
+  weeks: 4,
+  reference_price: 0,
+  weekly_average_units_sold: 0,
+  unit_cost_ratio: 0.6,
+  demand_ratio: 0.5,
+  elasticity: -2,
 };
 
-const fields = [
-  {
-    name: "stock",
-    label: "Stok yang akan dihabiskan",
-    min: "1",
-    max: "1000000",
-    step: "1",
-    help: "Jumlah stok awal untuk skenario markdown.",
-  },
+const discountOptions = [0, 5, 10, 15, 20, 25];
 
-  {
-    name: "price",
-    label: "Harga referensi rata-rata",
-    min: "0.000001",
-    step: "0.0000000001",
-    help: "Rata-rata Price Retail Sales kategori Clothing dengan presisi perhitungan.",
-  },
+export default function Simulator() {
+  const [form, setForm] = useState(initialForm);
 
-  {
-    name: "weekly_average",
-    label: "Rata-rata unit terjual per minggu",
-    min: "1",
-    max: "1000000",
-    step: "1",
-    help: "Dihitung dari total Units Sold 2023 dibagi rentang hari, dikali tujuh.",
-  },
+  const [model, setModel] = useState(null);
 
-  {
-    name: "demand_ratio",
-    label: "Rasio permintaan dasar",
-    min: "0.10",
-    max: "2.00",
-    step: "0.01",
-    help: "Proporsi rata-rata penjualan mingguan sebagai permintaan dasar.",
-  },
+  const [loadingDefaults, setLoadingDefaults] = useState(true);
 
-  {
-    name: "hpp_ratio",
-    label: "Rasio harga pokok (HPP)",
-    min: "0.00",
-    max: "1.00",
-    step: "0.01",
-    help: "Proporsi HPP terhadap harga referensi.",
-  },
-];
-
-function buildDefaultForm(summary) {
-  if (!summary?.available) {
-    return baseline;
-  }
-
-  return {
-    ...baseline,
-
-    price: String(summary.average_price || baseline.price),
-
-    weekly_average: String(summary.weekly_average || baseline.weekly_average),
-  };
-}
-
-function Metric({ label, value, detail }) {
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-4">
-      <p className="text-xs text-zinc-500">{label}</p>
-
-      <p className="mt-2 break-words text-xl font-semibold text-white">
-        {value}
-      </p>
-
-      {detail && <p className="mt-1 text-xs text-zinc-600">{detail}</p>}
-    </div>
-  );
-}
-
-export default function Simulator({ onOpenData }) {
-  const [context, setContext] = useState(null);
-
-  const [loadingContext, setLoadingContext] = useState(true);
-
-  const [contextError, setContextError] = useState("");
-
-  const [form, setForm] = useState(baseline);
-
-  const [result, setResult] = useState(null);
-
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [error, setError] = useState("");
+
+  const [result, setResult] = useState(null);
 
   useEffect(() => {
     let active = true;
 
-    api
-
-      .get("/data/summary/?source=sales&year=2023")
-
-      .then((response) => {
+    Promise.all([
+      api.get("/data/summary/?year=2023"),
+      api.get("/data/elasticity/?year=2023"),
+    ])
+      .then(([summary, elasticity]) => {
         if (!active) return;
 
-        setContext(response);
+        setModel(elasticity);
 
-        setContextError("");
+        setForm((current) => ({
+          ...current,
+          reference_price: summary.average_price,
+          weekly_average_units_sold: summary.weekly_average_units_sold,
+          elasticity: elasticity.elasticity_used,
+        }));
 
-        if (response.available) {
-          setForm(buildDefaultForm(response));
-        }
+        setError("");
       })
-
       .catch((err) => {
         if (active) {
-          setContextError(err.message);
+          setError(err.message);
         }
       })
-
       .finally(() => {
         if (active) {
-          setLoadingContext(false);
+          setLoadingDefaults(false);
         }
       });
 
@@ -143,424 +69,389 @@ export default function Simulator({ onOpenData }) {
     };
   }, []);
 
-  function handleChange(event) {
-    const { name, value } = event.target;
-
-    setForm((previous) => ({
-      ...previous,
-
-      [name]: value,
+  function updateField(field, value) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
     }));
-
-    setResult(null);
-
-    setError("");
-  }
-
-  function resetForm() {
-    setForm(buildDefaultForm(context));
-
-    setResult(null);
-
-    setError("");
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!context?.available) {
-      setError(
-        "Impor Retail Sales terlebih dahulu sebelum menjalankan simulasi.",
-      );
-
-      return;
-    }
-
-    setLoading(true);
-
+    setSubmitting(true);
     setError("");
-
     setResult(null);
 
     try {
-      const response = await api.post(
-        "/optimize/",
+      const payload = {
+        stock: Number(form.stock),
 
-        {
-          ...form,
+        weeks: Number(form.weeks),
 
-          source: "sales",
+        reference_price: Number(form.reference_price),
 
-          year: 2023,
-        },
-      );
+        weekly_average_units_sold: Number(form.weekly_average_units_sold),
+
+        unit_cost_ratio: Number(form.unit_cost_ratio),
+
+        demand_ratio: Number(form.demand_ratio),
+
+        elasticity: Number(form.elasticity),
+
+        discount_options: discountOptions,
+      };
+
+      const response = await api.post("/optimize/", payload);
 
       setResult(response);
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
+  }
+
+  if (loadingDefaults) {
+    return (
+      <p className="text-sm text-zinc-400">Menyiapkan parameter simulasi...</p>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="max-w-3xl text-sm leading-6 text-zinc-400">
-            Sistem membandingkan 1.296 kombinasi diskon untuk empat minggu.
-            Rekomendasi dipilih dari kombinasi yang mampu menghabiskan stok
-            dengan laba kotor simulasi tertinggi.
-          </p>
+      {model && (
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusTag good={model.reliable}>
+            {model.reliable
+              ? "Elastisitas dari regresi"
+              : "Elastisitas asumsi -2,0"}
+          </StatusTag>
 
-          <p className="mt-2 text-xs text-zinc-500">
-            Sumber parameter historis: Retail Sales · Clothing · 2023. Horizon
-            simulasi: 4 minggu.
-          </p>
+          <span className="text-xs text-zinc-500">
+            Estimasi regresi: {formatNumber(model.elasticity_estimated, 4)}
+            {" · "}
+            R² training: {formatNumber(model.train_r2, 4)}
+          </span>
         </div>
+      )}
 
-        <button
-          type="button"
-          onClick={resetForm}
-          className="rounded-md border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-900"
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <Panel
+          title="Parameter simulasi"
+          subtitle="Nilai awal mengikuti pendekatan dalam makalah. Ubah sesuai skenario yang ingin diuji."
         >
-          Kembalikan parameter awal
-        </button>
-      </div>
-
-      {loadingContext && (
-        <p className="text-sm text-zinc-400">
-          Mengambil parameter dari Retail Sales 2023...
-        </p>
-      )}
-
-      {contextError && (
-        <div
-          role="alert"
-          className="rounded-md border border-amber-900 bg-amber-950/20 px-4 py-3 text-sm text-amber-300"
-        >
-          Data dasar belum dapat dibaca: {contextError}
-        </div>
-      )}
-
-      {!loadingContext && !context?.available && (
-        <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-5">
-          <h3 className="font-medium text-amber-200">
-            Retail Sales 2023 belum diimpor
-          </h3>
-
-          <p className="mt-2 text-sm leading-6 text-zinc-400">
-            Simulasi menggunakan rata-rata harga dan penjualan dari dataset
-            Retail Sales. Impor file sales_data.csv pada halaman Kelola Dataset
-            agar parameter awal sesuai dengan Power BI.
-          </p>
-
-          <button
-            type="button"
-            onClick={onOpenData}
-            className="mt-4 rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-zinc-200"
-          >
-            Buka Kelola Dataset
-          </button>
-        </div>
-      )}
-
-      {context?.available && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric
-            label="Observasi Clothing 2023"
-            value={formatNumber(context.rows)}
-            detail="Retail Sales"
-          />
-
-          <Metric
-            label="Rata-rata harga referensi"
-            value={formatNumber(context.average_price, 6)}
-            detail="Satuan nilai dataset"
-          />
-
-          <Metric
-            label="Rata-rata penjualan mingguan"
-            value={formatNumber(context.weekly_average)}
-            detail="Unit per minggu"
-          />
-
-          <Metric
-            label="Rentang data"
-            value="365 hari"
-            detail={`${context.first_date} – ${context.last_date}`}
-          />
-        </div>
-      )}
-
-      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <form
-          onSubmit={handleSubmit}
-          className="h-fit rounded-lg border border-zinc-800 bg-[#111114] p-5"
-        >
-          <div>
-            <h3 className="font-medium text-white">Parameter simulasi</h3>
-
-            <p className="mt-1 text-xs leading-5 text-zinc-500">
-              Nilai awal diambil dari data 2023 dan asumsi pada makalah.
-            </p>
-          </div>
-
-          <div className="mt-6 space-y-5">
-            {fields.map((field) => (
-              <div key={field.name}>
-                <label
-                  htmlFor={field.name}
-                  className="mb-2 block text-sm text-zinc-300"
-                >
-                  {field.label}
-                </label>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-xs text-zinc-400">Stok awal (unit)</span>
 
                 <input
-                  id={field.name}
-                  name={field.name}
                   type="number"
+                  min="1"
+                  max="1000000"
+                  value={form.stock}
+                  onChange={(event) => updateField("stock", event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
                   required
-                  min={field.min}
-                  max={field.max}
-                  step={field.step}
-                  value={form[field.name]}
-                  onChange={handleChange}
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
                 />
-
-                <p className="mt-1.5 text-xs leading-5 text-zinc-600">
-                  {field.help}
-                </p>
-              </div>
-            ))}
-
-            <div>
-              <label
-                htmlFor="elasticity"
-                className="mb-2 block text-sm text-zinc-300"
-              >
-                Elastisitas harga (asumsi)
               </label>
 
-              <select
-                id="elasticity"
-                name="elasticity"
-                value={form.elasticity}
-                onChange={handleChange}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
-              >
-                <option value="-1.5">−1,5</option>
+              <label className="block">
+                <span className="text-xs text-zinc-400">Horizon (minggu)</span>
 
-                <option value="-2.0">−2,0 (baseline makalah)</option>
-
-                <option value="-2.5">−2,5</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-md border border-zinc-800 bg-zinc-950 p-3">
-            <p className="text-xs font-medium text-zinc-300">
-              Pilihan diskon yang diuji
-            </p>
-
-            <p className="mt-1 text-xs leading-5 text-zinc-500">
-              0%, 5%, 10%, 15%, 20%, dan 25% pada setiap minggu.
-            </p>
-          </div>
-
-          {error && (
-            <div
-              role="alert"
-              className="mt-4 rounded-md border border-red-900 bg-red-950/30 p-3 text-sm text-red-300"
-            >
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading || loadingContext || !context?.available}
-            className="mt-5 w-full rounded-md bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Menghitung..." : "Jalankan simulasi"}
-          </button>
-        </form>
-
-        <div className="min-w-0 space-y-5">
-          {result ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Metric
-                  label="Unit terjual"
-                  value={formatNumber(result.total_sold)}
-                  detail="Dari stok awal"
-                />
-
-                <Metric
-                  label="Sisa stok"
-                  value={formatNumber(result.remaining)}
-                  detail="Target akhir: 0 unit"
-                />
-
-                <Metric
-                  label="Laba kotor simulasi"
-                  value={formatNumber(result.total_profit, 2)}
-                  detail="Satuan nilai dataset"
-                />
-              </div>
-
-              <section className="rounded-lg border border-zinc-800 bg-[#111114] p-5">
-                <h3 className="font-medium text-white">
-                  Rekomendasi diskon mingguan
-                </h3>
-
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  Kombinasi diskon yang memenuhi target penghabisan stok dengan
-                  laba kotor tertinggi berdasarkan parameter yang digunakan.
-                </p>
-
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {result.best_plan.map((discount, index) => (
-                    <div
-                      key={index}
-                      className="rounded-md border border-zinc-800 bg-zinc-950 p-4"
-                    >
-                      <p className="text-xs text-zinc-500">
-                        Minggu {index + 1}
-                      </p>
-
-                      <p className="mt-2 text-2xl font-semibold text-white">
-                        {discount}%
-                      </p>
-                    </div>
+                <select
+                  value={form.weeks}
+                  onChange={(event) => updateField("weeks", event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((value) => (
+                    <option key={value} value={value}>
+                      {value} minggu
+                    </option>
                   ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-xs text-zinc-400">Harga referensi</span>
+
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={form.reference_price}
+                  onChange={(event) =>
+                    updateField("reference_price", event.target.value)
+                  }
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  required
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs text-zinc-400">
+                  Rata-rata penjualan mingguan
+                </span>
+
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={form.weekly_average_units_sold}
+                  onChange={(event) =>
+                    updateField("weekly_average_units_sold", event.target.value)
+                  }
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  required
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs text-zinc-400">
+                  Rasio harga pokok (HPP)
+                </span>
+
+                <input
+                  type="number"
+                  min="0"
+                  max="0.99"
+                  step="0.01"
+                  value={form.unit_cost_ratio}
+                  onChange={(event) =>
+                    updateField("unit_cost_ratio", event.target.value)
+                  }
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  required
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs text-zinc-400">Faktor permintaan</span>
+
+                <input
+                  type="number"
+                  min="0.1"
+                  max="2"
+                  step="0.05"
+                  value={form.demand_ratio}
+                  onChange={(event) =>
+                    updateField("demand_ratio", event.target.value)
+                  }
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  required
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="text-xs text-zinc-400">
+                  Elastisitas yang dipakai
+                </span>
+
+                <input
+                  type="number"
+                  min="-5"
+                  max="-0.1"
+                  step="0.1"
+                  value={form.elasticity}
+                  onChange={(event) =>
+                    updateField("elasticity", event.target.value)
+                  }
+                  className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+                  required
+                />
+
+                <span className="mt-1 block text-xs text-zinc-600">
+                  Nilai negatif. Nilai awal berasal dari hasil pemeriksaan
+                  model.
+                </span>
+              </label>
+            </div>
+
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+              <p className="text-xs text-zinc-400">
+                Alternatif diskon yang diuji
+              </p>
+
+              <p className="mt-2 text-sm font-medium text-white">
+                {discountOptions.map((value) => `${value}%`).join(" · ")}
+              </p>
+            </div>
+
+            {error && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-900 bg-red-950/30 p-3 text-sm text-red-300"
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-lg bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
+            >
+              {submitting
+                ? "Menghitung kombinasi..."
+                : "Jalankan optimasi diskon"}
+            </button>
+          </form>
+        </Panel>
+
+        <div className="space-y-4">
+          {!result ? (
+            <Panel
+              title="Hasil optimasi"
+              subtitle="Hasil simulasi akan muncul setelah parameter dijalankan."
+            >
+              <div className="py-14 text-center">
+                <p className="text-sm text-zinc-500">
+                  Belum ada hasil simulasi pada sesi ini.
+                </p>
+              </div>
+            </Panel>
+          ) : (
+            <>
+              <Panel title="Rekomendasi diskon mingguan">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-zinc-500">
+                      Kombinasi diskon terbaik
+                    </p>
+
+                    <p className="mt-2 text-2xl font-semibold text-white">
+                      {result.best_plan.map((value) => `${value}%`).join(" / ")}
+                    </p>
+                  </div>
+
+                  <StatusTag good={result.stock_cleared}>
+                    {result.stock_cleared
+                      ? "Stok habis"
+                      : "Target belum tercapai"}
+                  </StatusTag>
                 </div>
 
-                <div className="mt-6 overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-left text-sm">
-                    <thead className="border-b border-zinc-800 text-zinc-500">
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <StatCard
+                    label="Laba kotor simulasi"
+                    value={formatNumber(result.total_profit, 2)}
+                    detail="Satuan nilai pada dataset."
+                  />
+
+                  <StatCard
+                    label="Sisa stok"
+                    value={formatNumber(result.remaining)}
+                    detail={`${formatNumber(result.total_sold)} unit terjual dalam simulasi.`}
+                  />
+                </div>
+
+                <div className="mt-5 overflow-x-auto">
+                  <table className="w-full min-w-[650px] text-left text-sm">
+                    <thead className="border-b border-zinc-800 text-xs text-zinc-500">
                       <tr>
-                        <th className="px-3 py-3 font-medium">Minggu</th>
+                        <th className="px-3 py-3">Minggu</th>
 
-                        <th className="px-3 py-3 font-medium">Diskon</th>
+                        <th className="px-3 py-3 text-right">Diskon</th>
 
-                        <th className="px-3 py-3 text-right font-medium">
-                          Harga setelah diskon
+                        <th className="px-3 py-3 text-right">Harga jual</th>
+
+                        <th className="px-3 py-3 text-right">
+                          Estimasi terjual
                         </th>
 
-                        <th className="px-3 py-3 text-right font-medium">
-                          Estimasi permintaan
-                        </th>
+                        <th className="px-3 py-3 text-right">Sisa stok</th>
 
-                        <th className="px-3 py-3 text-right font-medium">
-                          Unit terjual
-                        </th>
-
-                        <th className="px-3 py-3 text-right font-medium">
-                          Sisa stok
-                        </th>
-
-                        <th className="px-3 py-3 text-right font-medium">
-                          Laba kotor
-                        </th>
+                        <th className="px-3 py-3 text-right">Laba kotor</th>
                       </tr>
                     </thead>
 
                     <tbody>
-                      {result.schedule.map((row) => (
+                      {result.schedule.map((item) => (
                         <tr
-                          key={row.week}
+                          key={item.week}
                           className="border-b border-zinc-800/70 last:border-0"
                         >
-                          <td className="px-3 py-4 text-zinc-200">
-                            {row.week}
+                          <td className="px-3 py-3 text-zinc-300">
+                            {item.week}
                           </td>
 
-                          <td className="px-3 py-4 text-zinc-200">
-                            {row.discount}%
+                          <td className="px-3 py-3 text-right text-white">
+                            {item.discount}%
                           </td>
 
-                          <td className="px-3 py-4 text-right text-zinc-300">
-                            {formatNumber(row.selling_price, 4)}
+                          <td className="px-3 py-3 text-right text-zinc-300">
+                            {formatNumber(item.selling_price, 2)}
                           </td>
 
-                          <td className="px-3 py-4 text-right text-zinc-400">
-                            {formatNumber(row.demand)}
+                          <td className="px-3 py-3 text-right text-zinc-300">
+                            {formatNumber(item.estimated_sold)}
                           </td>
 
-                          <td className="px-3 py-4 text-right text-zinc-200">
-                            {formatNumber(row.sold)}
+                          <td className="px-3 py-3 text-right text-zinc-300">
+                            {formatNumber(item.remaining_stock)}
                           </td>
 
-                          <td className="px-3 py-4 text-right text-zinc-400">
-                            {formatNumber(row.remaining)}
-                          </td>
-
-                          <td className="px-3 py-4 text-right text-zinc-200">
-                            {formatNumber(row.profit, 2)}
+                          <td className="px-3 py-3 text-right text-zinc-300">
+                            {formatNumber(item.gross_profit, 2)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </section>
+              </Panel>
 
-              <section className="rounded-lg border border-zinc-800 bg-[#111114] p-5">
-                <h3 className="font-medium text-white">
-                  Perbandingan strategi diskon
-                </h3>
+              <Panel title="Perbandingan dengan diskon tetap 20%">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-zinc-500">
+                      Laba kotor diskon tetap
+                    </p>
 
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <Metric
-                    label="Kombinasi diuji"
-                    value={formatNumber(result.tested_plans)}
-                  />
+                    <p className="mt-2 text-xl font-semibold text-white">
+                      {formatNumber(result.fixed_comparison.total_profit, 2)}
+                    </p>
 
-                  <Metric
-                    label="Kombinasi memenuhi target"
-                    value={formatNumber(result.feasible_plans)}
-                  />
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Sisa stok:{" "}
+                      {formatNumber(result.fixed_comparison.remaining)}
+                    </p>
+                  </div>
 
-                  <Metric
-                    label="Laba diskon tetap 20%"
-                    value={formatNumber(result.comparison.fixed_plan_profit, 2)}
-                    detail={
-                      result.comparison.fixed_plan_feasible
-                        ? "Stok habis dalam 4 minggu"
-                        : "Stok belum habis dalam 4 minggu"
-                    }
-                  />
+                  <div>
+                    <p className="text-xs text-zinc-500">
+                      Perubahan laba kotor
+                    </p>
 
-                  <Metric
-                    label="Peningkatan laba simulasi"
-                    value={
-                      result.comparison.improvement_percent !== null
-                        ? `${formatNumber(
-                            result.comparison.improvement_percent,
+                    <p className="mt-2 text-xl font-semibold text-white">
+                      {result.fixed_comparison.profit_improvement === null
+                        ? "Tidak dapat dibandingkan"
+                        : formatNumber(
+                            result.fixed_comparison.profit_improvement,
                             2,
-                          )}%`
-                        : "Tidak dapat dihitung"
-                    }
-                    detail="Dibandingkan diskon tetap 20%"
-                  />
-                </div>
-              </section>
-            </>
-          ) : (
-            <section className="flex min-h-72 items-center justify-center rounded-lg border border-zinc-800 bg-[#111114] p-8">
-              <div className="max-w-md text-center">
-                <h3 className="font-medium text-zinc-200">
-                  Belum ada hasil simulasi
-                </h3>
+                          )}
+                    </p>
 
-                <p className="mt-2 text-sm leading-6 text-zinc-500">
-                  Pastikan Retail Sales 2023 sudah diimpor, kemudian jalankan
-                  simulasi untuk membandingkan 1.296 kombinasi diskon.
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {result.fixed_comparison.improvement_percent === null
+                        ? "Strategi diskon tetap tidak menghabiskan stok."
+                        : `${formatNumber(
+                            result.fixed_comparison.improvement_percent,
+                            2,
+                          )}% dibandingkan diskon tetap.`}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-xs leading-5 text-zinc-500">
+                  {result.interpretation} Optimasi menguji{" "}
+                  {formatNumber(result.tested_plans)} kombinasi, dengan{" "}
+                  {formatNumber(result.feasible_plans)}
+                  kombinasi yang menghabiskan stok.
                 </p>
-              </div>
-            </section>
+              </Panel>
+            </>
           )}
         </div>
       </div>

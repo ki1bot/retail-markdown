@@ -3,33 +3,37 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { formatDate, formatNumber } from "../lib/format";
 
+import Panel from "./common/Panel";
+import StatusTag from "./common/StatusTag";
+
 export default function History() {
-  const [history, setHistory] = useState([]);
+  const [items, setItems] = useState([]);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
 
-    async function loadHistory() {
-      try {
-        const response = await api.get("/history/");
-
+    api
+      .get("/history/")
+      .then((data) => {
         if (active) {
-          setHistory(response);
+          setItems(data);
+          setError("");
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (active) {
           setError(err.message);
         }
-      } finally {
+      })
+      .finally(() => {
         if (active) {
           setLoading(false);
         }
-      }
-    }
-
-    loadHistory();
+      });
 
     return () => {
       active = false;
@@ -37,71 +41,87 @@ export default function History() {
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-zinc-400">Memuat riwayat...</p>;
+    return <p className="text-sm text-zinc-400">Memuat riwayat simulasi...</p>;
   }
 
   if (error) {
-    return <p className="text-sm text-red-300">{error}</p>;
+    return (
+      <div className="rounded-xl border border-red-900 bg-red-950/30 p-5 text-sm text-red-300">
+        {error}
+      </div>
+    );
   }
 
   return (
-    <section className="rounded-lg border border-zinc-800 bg-[#111114] p-5">
-      <h3 className="font-medium text-white">Simulasi tersimpan</h3>
-
-      <p className="mt-2 text-sm text-zinc-400">
-        Menampilkan 20 simulasi terbaru.
-      </p>
-
-      {history.length === 0 ? (
-        <p className="mt-8 text-sm text-zinc-500">
-          Belum ada simulasi yang tersimpan.
+    <Panel
+      title="30 simulasi terbaru"
+      subtitle="Riwayat tersimpan di PostgreSQL."
+    >
+      {items.length === 0 ? (
+        <p className="py-10 text-center text-sm text-zinc-500">
+          Belum ada simulasi. Jalankan simulasi dari menu Simulasi Diskon.
         </p>
       ) : (
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-zinc-800 text-zinc-500">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-zinc-800 text-xs text-zinc-500">
               <tr>
-                <th className="px-3 py-3 font-medium">Waktu</th>
-                <th className="px-3 py-3 font-medium">Stok</th>
-                <th className="px-3 py-3 font-medium">Diskon</th>
-                <th className="px-3 py-3 text-right font-medium">Laba kotor</th>
-                <th className="px-3 py-3 text-right font-medium">Sisa stok</th>
+                <th className="px-3 py-3">Waktu</th>
+
+                <th className="px-3 py-3 text-right">Stok awal</th>
+
+                <th className="px-3 py-3">Rencana diskon</th>
+
+                <th className="px-3 py-3 text-right">Laba kotor</th>
+
+                <th className="px-3 py-3 text-right">Sisa stok</th>
+
+                <th className="px-3 py-3">Status</th>
               </tr>
             </thead>
 
             <tbody>
-              {history.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-zinc-800/70 last:border-0"
-                >
-                  <td className="px-3 py-4 text-zinc-400">
-                    {formatDate(item.created_at)}
-                  </td>
+              {items.map((item) => {
+                const result = item.result_data;
+                const input = item.input_data;
 
-                  <td className="px-3 py-4 text-zinc-200">
-                    {formatNumber(item.result_data.stock)}
-                  </td>
+                return (
+                  <tr
+                    key={item.id}
+                    className="border-b border-zinc-800/70 last:border-0"
+                  >
+                    <td className="px-3 py-4 text-zinc-400">
+                      {formatDate(item.created_at)}
+                    </td>
 
-                  <td className="px-3 py-4 text-zinc-200">
-                    {item.result_data.best_plan
-                      .map((value) => `${value}%`)
-                      .join(" / ")}
-                  </td>
+                    <td className="px-3 py-4 text-right text-zinc-300">
+                      {formatNumber(input.stock)}
+                    </td>
 
-                  <td className="px-3 py-4 text-right text-zinc-200">
-                    {formatNumber(item.result_data.total_profit, 2)}
-                  </td>
+                    <td className="px-3 py-4 text-zinc-200">
+                      {result.best_plan.map((value) => `${value}%`).join(" / ")}
+                    </td>
 
-                  <td className="px-3 py-4 text-right text-zinc-400">
-                    {formatNumber(item.result_data.remaining)}
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-3 py-4 text-right text-zinc-200">
+                      {formatNumber(result.total_profit, 2)}
+                    </td>
+
+                    <td className="px-3 py-4 text-right text-zinc-300">
+                      {formatNumber(result.remaining)}
+                    </td>
+
+                    <td className="px-3 py-4">
+                      <StatusTag good={result.stock_cleared}>
+                        {result.stock_cleared ? "Stok habis" : "Belum habis"}
+                      </StatusTag>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
-    </section>
+    </Panel>
   );
 }

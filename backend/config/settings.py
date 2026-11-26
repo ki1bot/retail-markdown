@@ -4,7 +4,6 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 def env_bool(name, default=False):
-
     value = os.environ.get(
         name,
         str(default),
@@ -80,17 +79,14 @@ DATABASES = {
         "NAME": os.environ["POSTGRES_DB"],
         "USER": os.environ["POSTGRES_USER"],
         "PASSWORD": os.environ["POSTGRES_PASSWORD"],
-
         "HOST": os.environ.get(
             "POSTGRES_HOST",
             "localhost",
         ),
-
         "PORT": os.environ.get(
             "POSTGRES_PORT",
             "5432",
         ),
-
         "CONN_MAX_AGE": 60,
         "CONN_HEALTH_CHECKS": True,
     }
@@ -144,7 +140,6 @@ USE_I18N = True
 USE_TZ = True
 
 SESSION_COOKIE_HTTPONLY = True
-
 SESSION_COOKIE_SAMESITE = "Lax"
 
 SESSION_COOKIE_SECURE = env_bool(
@@ -153,7 +148,6 @@ SESSION_COOKIE_SECURE = env_bool(
 )
 
 CSRF_COOKIE_HTTPONLY = False
-
 CSRF_COOKIE_SAMESITE = "Lax"
 
 CSRF_COOKIE_SECURE = env_bool(
@@ -165,9 +159,16 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 
 X_FRAME_OPTIONS = "DENY"
 
-DATA_UPLOAD_MAX_MEMORY_SIZE = 18000000
+DATA_UPLOAD_MAX_MEMORY_SIZE = 180 * 1024 * 1024
 
-FILE_UPLOAD_MAX_MEMORY_SIZE = 15000000
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+
+DATASET_DIR = Path(
+    os.environ.get(
+        "DATASET_DIR",
+        str(BASE_DIR.parent / "data"),
+    )
+)
 
 STATIC_URL = "static/"
 
